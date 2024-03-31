@@ -121,6 +121,16 @@ impl Lexer {
                         continue;
                     }
 
+                    if content == "true" {
+                        lexer.push_token(Token::Boolean(true));
+                        continue;
+                    }
+
+                    if content == "false" {
+                        lexer.push_token(Token::Boolean(false));
+                        continue;
+                    }
+
                     lexer.push_token(Token::Identifier(content));
                 }
                 '\'' => {
@@ -217,6 +227,18 @@ mod tests {
             Token::Identifier("hello".to_string()),
             Token::Eq,
             Token::String("yay!".to_string()),
+        ]);
+    }
+
+    #[test]
+    fn tokenize_boolean() {
+        let input = "let isAwesome = true";
+        let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
+        assert_eq!(tokens, vec![
+            Token::Let,
+            Token::Identifier("isAwesome".to_string()),
+            Token::Eq,
+            Token::Boolean(true),
         ]);
     }
 }
