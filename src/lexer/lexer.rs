@@ -88,11 +88,12 @@ impl Lexer {
                 ';' => lexer.push_token(Token::SemiConlon),
                 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
                     let mut content = String::from(ch);
-                    while let Some(c) = stream.next() {
-                        if !c.is_alphanumeric() && c != '_' {
+                    while let Some(c) = stream.peek(1).get(0) {
+                        if !c.is_alphanumeric() && *c != '_' {
                             break;
                         }
-                        content.push(c);
+                        content.push(*c);
+                        stream.next();
                     }
 
                     if content == "fn" {
@@ -121,6 +122,16 @@ impl Lexer {
                     }
 
                     lexer.push_token(Token::Identifier(content));
+                }
+                '\'' => {
+                    let mut content = String::new();
+                    while let Some(c) = stream.next() {
+                        if c == '\'' {
+                            break;
+                        }
+                        content.push(c);
+                    }
+                    lexer.push_token(Token::String(content));
                 }
                 _ => {
                     return Err(LexingError::UnexpectedCharacter(ch));
@@ -194,6 +205,18 @@ mod tests {
             Token::Let,
             Token::Identifier("_something_else20".to_string()),
             Token::Return
+        ]);
+    }
+
+    #[test]
+    fn tokenize_string_literals() {
+        let input = "let hello = 'yay!'";
+        let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
+        assert_eq!(tokens, vec![
+            Token::Let,
+            Token::Identifier("hello".to_string()),
+            Token::Eq,
+            Token::String("yay!".to_string()),
         ]);
     }
 }
