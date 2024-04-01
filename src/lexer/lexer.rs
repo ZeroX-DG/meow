@@ -10,7 +10,9 @@ macro_rules! peek_next {
 
 #[derive(Debug)]
 pub enum LexingError {
-    UnexpectedCharacter(char)
+    UnexpectedCharacter(char),
+    InvalidFloatingNumberFormat,
+    InvalidIntFormat
 }
 
 pub struct Lexer {
@@ -86,7 +88,7 @@ impl Lexer {
                 '.' => lexer.push_token(Token::Period),
                 ':' => lexer.push_token(Token::Colon),
                 ';' => lexer.push_token(Token::SemiConlon),
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
+                'a'..='z' | 'A'..='Z' | '_' => {
                     let mut content = String::from(ch);
                     while let Some(c) = stream.peek(1).get(0) {
                         if !c.is_alphanumeric() && *c != '_' {
@@ -142,6 +144,26 @@ impl Lexer {
                         content.push(c);
                     }
                     lexer.push_token(Token::String(content));
+                }
+                '0'..='9' => {
+                    let mut content = String::from(ch);
+                    let mut is_float = false;
+                    while let Some(c) = stream.peek(1).get(0) {
+                        if !c.is_numeric() && *c != '.' {
+                            break;
+                        }
+                        if *c == '.' {
+                            is_float = true;
+                        }
+                        content.push(*c);
+                        stream.next();
+                    }
+                    let token = if is_float {
+                        Token::Float(content.parse().map_err(|_| LexingError::InvalidFloatingNumberFormat)?)
+                    } else {
+                        Token::Int(content.parse().map_err(|_| LexingError::InvalidIntFormat)?)
+                    };
+                    lexer.push_token(token);
                 }
                 _ => {
                     return Err(LexingError::UnexpectedCharacter(ch));
@@ -239,6 +261,30 @@ mod tests {
             Token::Identifier("isAwesome".to_string()),
             Token::Eq,
             Token::Boolean(true),
+        ]);
+    }
+
+    #[test]
+    fn tokenize_float_literals() {
+        let input = "let age = 10.5235";
+        let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
+        assert_eq!(tokens, vec![
+            Token::Let,
+            Token::Identifier("age".to_string()),
+            Token::Eq,
+            Token::Float(10.5235),
+        ]);
+    }
+
+    #[test]
+    fn tokenize_innt_literals() {
+        let input = "let age = 22";
+        let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
+        assert_eq!(tokens, vec![
+            Token::Let,
+            Token::Identifier("age".to_string()),
+            Token::Eq,
+            Token::Int(22),
         ]);
     }
 }
