@@ -137,10 +137,31 @@ impl Lexer {
                 }
                 '\'' => {
                     let mut content = String::new();
-                    while let Some(c) = stream.next() {
+                    while let Some(c) = stream.peek(1).get(0).cloned() {
+                        if c == '\\' {
+                            stream.next();
+
+                            if let Some(c2) = stream.next() {
+                                if c2 == 'n' {
+                                    content.push('\n');
+                                } else if c2 == 'r' {
+                                    content.push('\r');
+                                } else if c2 == 't' {
+                                    content.push('\t');
+                                } else if c2 == '0' {
+                                    content.push('\0');
+                                } else {
+                                    content.push(c2);
+                                }
+                            }
+                            continue;
+                        }
+
                         if c == '\'' {
+                            stream.next();
                             break;
                         }
+                        stream.next();
                         content.push(c);
                     }
                     lexer.push_token(Token::String(content));
@@ -242,13 +263,13 @@ mod tests {
 
     #[test]
     fn tokenize_string_literals() {
-        let input = "let hello = 'yay!'";
+        let input = "let hello = 'Hi! I\\'m Hung'";
         let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
         assert_eq!(tokens, vec![
             Token::Let,
             Token::Identifier("hello".to_string()),
             Token::Eq,
-            Token::String("yay!".to_string()),
+            Token::String("Hi! I'm Hung".to_string()),
         ]);
     }
 
