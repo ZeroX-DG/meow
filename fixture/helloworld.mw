@@ -1,6 +1,6 @@
 let name: string = 'Hung';
-mut age: number = 22;
+//let mut age: number = 22;
 
-let hello = fn(name: string, age: number) => console.log('Hello my name is ' + name + '. I\'m ' + age + 'years old!');
+//let hello = fn(name: string, age: number) => console.log('Hello my name is ' + name + '. I\'m ' + age + 'years old!');
 
-hello(name, age);
+//hello(name, age);

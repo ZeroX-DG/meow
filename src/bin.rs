@@ -14,5 +14,6 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let file_content = fs::read_to_string(args.input).expect("Unable to read file");
-    meowscript::compile(&file_content);
+    let compiled = meowscript::compile(&file_content);
+    println!("{}", compiled);
 }

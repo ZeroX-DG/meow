@@ -1,4 +1,4 @@
-mod ast;
+pub mod ast;
 use crate::stream::ParsingStream;
 
 use self::ast::{Expression, ExpressionKind, Identifier, Item, ItemKind, Literal, LiteralKind, Program, Statement, StatementKind, Type, TypeKind, VariableDeclaration, VariableDeclarationKind};
