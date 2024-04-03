@@ -1,5 +1,5 @@
 let name: string = 'Hung';
-//let mut age: number = 22;
+let mut age: number = 22;
 
 //let hello = fn(name: string, age: number) => console.log('Hello my name is ' + name + '. I\'m ' + age + 'years old!');
 

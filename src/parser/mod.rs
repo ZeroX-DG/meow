@@ -48,16 +48,27 @@ impl Parser {
     }
 
     fn parse_variable_declaration(stream: &mut ParsingStream<&Token>) -> Result<Statement, ParsingError> {
-        let Some(Token::Identifier(ident)) = stream.next() else {
-            return Err(ParsingError::ExpectToken("Expected Identifier token".to_string()))
+        let (variable_name, is_mutable) = match stream.next() {
+            Some(Token::Identifier(ident)) => (ident.to_owned(), false),
+            Some(Token::Mut) => {
+                let name_token = stream.next();
+                let Some(Token::Identifier(ident)) = name_token else {
+                    return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", name_token)))
+                };
+                (ident.to_owned(), true)
+            }
+            _ => {
+                return Err(ParsingError::UnexpectedEOF);
+            }
         };
 
         let variable_type = if let Some(Token::Colon) = stream.peek(1).get(0) {
             stream.next();
-            if let Some(Token::Identifier(name)) = stream.next() {
+            let maybe_type_token = stream.next();
+            if let Some(Token::Identifier(name)) = maybe_type_token {
                 Type { kind: TypeKind::Ident(Identifier { name: name.to_owned(), mutable: false }) }
             } else {
-                return Err(ParsingError::ExpectToken("Expected Identifier token".to_string()));
+                return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", maybe_type_token)));
             }
         } else {
             Type { kind: TypeKind::Infer }
@@ -71,7 +82,7 @@ impl Parser {
 
         let variable_declaration = VariableDeclaration {
             kind: variable_declaration_kind,
-            identifier: Identifier { name: ident.to_owned(), mutable: false },
+            identifier: Identifier { name: variable_name, mutable: is_mutable },
             variable_type: variable_type
         };
         let statement = Statement {

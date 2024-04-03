@@ -20,15 +20,17 @@ impl Compiler {
     }
 
     fn compile_statement(statement: Statement) -> Result<String, CompileError> {
-        match statement.kind {
-            StatementKind::Let(declaration) => Compiler::compile_variable_declaration(declaration),
-        }
+        let result = match statement.kind {
+            StatementKind::Let(declaration) => Compiler::compile_variable_declaration(declaration)?,
+        };
+        Ok(format!("{}\n", result))
     }
 
     fn compile_variable_declaration(declaration: VariableDeclaration) -> Result<String, CompileError> {
+        let declaration_keyword = if declaration.identifier.mutable { "let" } else { "const" };
         match declaration.kind {
-            VariableDeclarationKind::Declaration => Ok(format!("const {};", declaration.identifier.name)),
-            VariableDeclarationKind::Init(expression) => Ok(format!("const {} = {};", declaration.identifier.name, Compiler::compile_expression(expression)?))
+            VariableDeclarationKind::Declaration => Ok(format!("{} {};", declaration_keyword, declaration.identifier.name)),
+            VariableDeclarationKind::Init(expression) => Ok(format!("{} {} = {};", declaration_keyword, declaration.identifier.name, Compiler::compile_expression(expression)?))
         }
     }
 
