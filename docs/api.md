@@ -23,12 +23,7 @@ Meow support 2 types of comments:
 
 ### Variable
 
-There are two ways to declare variables in meow:
-
-- `let` keyword, let you define an constant.
-- `mut` keyword, let you define a changable variable.
-
-It's recommended to use `let` by default and `mut` only when needed.
+Variables are declared using the `let` keyword and are immutable by default. You can use add the `mut` keyword after `let` to make the variable mutable.
 
 The type of the variable can be specified at the end or omitted to be inferred by the transpiler.
 
@@ -37,4 +32,22 @@ Examples:
 ```
 let name: string; // Explitcit type.
 let name = 'Bob'; // Inferred as string by transpiler.
+```
+
+### Function
+
+Functions are first-class entities in Meow. Thus, it can be assigned to a variable & passed in functions.
+
+Examples:
+
+```
+let myFunction = fn() { ... };
+
+// Function that doesn't take in any arguments can be simplified to:
+let myFunction = fn {}
+
+let functionThatReturn = fn(arg: string) -> string {}
+let functionThatReturn = fn -> string {}
+
+let find = fn(array: string[], pred: fn(string) -> bool) {}
 ```
