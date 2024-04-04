@@ -22,6 +22,7 @@ impl Compiler {
     fn compile_statement(statement: Statement) -> Result<String, CompileError> {
         let result = match statement.kind {
             StatementKind::Let(declaration) => Compiler::compile_variable_declaration(declaration)?,
+            StatementKind::Expr(expression) => Compiler::compile_expression(expression)?,
         };
         Ok(format!("{}\n", result))
     }
@@ -45,6 +46,9 @@ impl Compiler {
             ExpressionKind::Function(function) => {
                 let args: Vec<String> = function.args.iter().map(|arg| arg.identifier.name.clone()).collect();
                 Ok(format!("({}) => {{\n{}}}", args.join(", "), Compiler::compile_block(function.body)?))
+            }
+            ExpressionKind::PropertyAccess(path) => {
+                Ok(path.iter().map(|ident| ident.name.to_owned()).collect::<Vec<String>>().join("."))
             }
         }
     }

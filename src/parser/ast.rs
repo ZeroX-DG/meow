@@ -20,7 +20,8 @@ pub struct Statement {
 
 #[derive(Debug)]
 pub enum StatementKind {
-    Let(VariableDeclaration)
+    Let(VariableDeclaration),
+    Expr(Expression)
 }
 
 #[derive(Debug)]
@@ -44,7 +45,8 @@ pub struct Expression {
 #[derive(Debug)]
 pub enum ExpressionKind {
     Literal(Literal),
-    Function(Function)
+    Function(Function),
+    PropertyAccess(Vec<Identifier>)
 }
 
 #[derive(Debug)]

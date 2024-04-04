@@ -65,10 +65,10 @@ impl Parser {
     }
 
     fn parse_statement(stream: &mut ParsingStream<&Token>) -> Result<Statement, ParsingError> {
-        let kind = match stream.next() {
+        let kind = match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
             Token::Let => StatementKind::Let(Parser::parse_variable_declaration(stream)?),
             Token::EOF => return Err(ParsingError::UnexpectedEOF),
-            token => return Err(ParsingError::UnexpectedToken(token.clone())),
+            _ => StatementKind::Expr(Parser::parse_expression(stream)?),
         };
 
         stream.consume_until(|tk| matches!(tk, Token::SemiConlon));
@@ -77,6 +77,7 @@ impl Parser {
     }
 
     fn parse_variable_declaration(stream: &mut ParsingStream<&Token>) -> Result<VariableDeclaration, ParsingError> {
+        Parser::expect_token(stream.next(), Token::Let)?;
         let (variable_name, is_mutable) = match stream.next() {
             Token::Identifier(ident) => (ident.to_owned(), false),
             Token::Mut => {
@@ -137,12 +138,37 @@ impl Parser {
                     ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
                 },
                 Token::Function => ExpressionKind::Function(Parser::parse_function_expression(stream)?),
+                Token::Identifier(_) => {
+                    let property_path = Parser::parse_property_access_expression(stream)?;
+                    match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
+                        Token::SemiConlon => ExpressionKind::PropertyAccess(property_path),
+                        Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                        token => return Err(ParsingError::UnexpectedToken(token.clone()))
+                    }
+                },
                 _ => return Err(ParsingError::UnexpectedToken(token.clone()))
             }
             _ => return Err(ParsingError::UnexpectedEOF)
         };
         let expression = Expression { kind };
         Ok(expression)
+    }
+
+    fn parse_property_access_expression(stream: &mut ParsingStream<&Token>) -> Result<Vec<Identifier>, ParsingError> {
+        let mut path = Vec::new();
+        loop {
+            match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
+                Token::Identifier(ident) => {
+                    path.push(Identifier { mutable: false, name: ident.clone() });
+                    stream.next();
+                }
+                Token::Period => {
+                    stream.next();
+                },
+                _ => break,
+            }
+        }
+        Ok(path)
     }
 
     fn parse_function_expression(stream: &mut ParsingStream<&Token>) -> Result<Function, ParsingError> {
