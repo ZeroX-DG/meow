@@ -29,9 +29,10 @@ impl Lexer {
     pub fn tokenize(input: &str) -> Result<Vec<Token>, LexingError> {
         let mut lexer = Self::new();
         let mut chars = input.chars();
-        let mut stream = ParsingStream::new(&mut chars);
+        let mut stream = ParsingStream::new(&mut chars, '\0');
 
-        while let Some(ch) = stream.next() {
+        loop {
+            let ch = stream.next();
             match ch {
                 ch if ch.is_whitespace() => continue,
                 '(' => lexer.push_token(Token::ParenOpen),
@@ -140,19 +141,17 @@ impl Lexer {
                     while let Some(c) = stream.peek(1).get(0).cloned() {
                         if c == '\\' {
                             stream.next();
-
-                            if let Some(c2) = stream.next() {
-                                if c2 == 'n' {
-                                    content.push('\n');
-                                } else if c2 == 'r' {
-                                    content.push('\r');
-                                } else if c2 == 't' {
-                                    content.push('\t');
-                                } else if c2 == '0' {
-                                    content.push('\0');
-                                } else {
-                                    content.push(c2);
-                                }
+                            let c2 = stream.next();
+                            if c2 == 'n' {
+                                content.push('\n');
+                            } else if c2 == 'r' {
+                                content.push('\r');
+                            } else if c2 == 't' {
+                                content.push('\t');
+                            } else if c2 == '0' {
+                                content.push('\0');
+                            } else {
+                                content.push(c2);
                             }
                             continue;
                         }
@@ -185,6 +184,10 @@ impl Lexer {
                         Token::Int(content.parse().map_err(|_| LexingError::InvalidIntFormat)?)
                     };
                     lexer.push_token(token);
+                }
+                '\0' => {
+                    lexer.push_token(Token::EOF);
+                    break;
                 }
                 _ => {
                     return Err(LexingError::UnexpectedCharacter(ch));

@@ -1,29 +1,36 @@
 use std::collections::VecDeque;
 
-pub struct ParsingStream<'a, T> {
+pub struct ParsingStream<'a, T: PartialEq + Clone> {
     buffer: VecDeque<T>,
-    input: &'a mut dyn Iterator<Item=T>
+    input: &'a mut dyn Iterator<Item=T>,
+    stream_end_item: T
 }
 
-impl<'a, T> ParsingStream<'a, T> {
-    pub fn new(input: &'a mut dyn Iterator<Item=T>) -> Self {
+impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
+    pub fn new(input: &'a mut dyn Iterator<Item=T>, stream_end_item: T) -> Self {
         Self {
             buffer: VecDeque::new(),
             input,
+            stream_end_item
         }
     }
 
-    pub fn next(&mut self) -> Option<T> {
+    pub fn next(&mut self) -> T {
         if !self.buffer.is_empty() {
             let consumed = self.buffer.pop_front();
-            return consumed;
+            return consumed.unwrap();
         }
-        self.input.next()
+        self.input.next().unwrap_or(self.stream_end_item.clone())
     }
 
     pub fn consume_until<F: Fn(&T) -> bool>(&mut self, cond: F) {
-        while let Some(item) = self.next() {
+        loop {
+            let item = self.next();
             if cond(&item) {
+                break;
+            }
+
+            if item == self.stream_end_item {
                 break;
             }
         }

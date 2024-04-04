@@ -45,7 +45,7 @@ impl Parser {
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
         let mut tokens_iter = tokens.iter();
-        let mut stream = ParsingStream::new(&mut tokens_iter);
+        let mut stream = ParsingStream::new(&mut tokens_iter, &Token::EOF);
         
         while let Some(token) = stream.peek(1).get(0).cloned() {
             match token {
@@ -66,9 +66,9 @@ impl Parser {
 
     fn parse_statement(stream: &mut ParsingStream<&Token>) -> Result<Statement, ParsingError> {
         let kind = match stream.next() {
-            Some(Token::Let) => StatementKind::Let(Parser::parse_variable_declaration(stream)?),
-            Some(token) => return Err(ParsingError::UnexpectedToken(token.clone())),
-            None => return Err(ParsingError::UnexpectedEOF),
+            Token::Let => StatementKind::Let(Parser::parse_variable_declaration(stream)?),
+            Token::EOF => return Err(ParsingError::UnexpectedEOF),
+            token => return Err(ParsingError::UnexpectedToken(token.clone())),
         };
 
         stream.consume_until(|tk| matches!(tk, Token::SemiConlon));
@@ -78,23 +78,22 @@ impl Parser {
 
     fn parse_variable_declaration(stream: &mut ParsingStream<&Token>) -> Result<VariableDeclaration, ParsingError> {
         let (variable_name, is_mutable) = match stream.next() {
-            Some(Token::Identifier(ident)) => (ident.to_owned(), false),
-            Some(Token::Mut) => {
+            Token::Identifier(ident) => (ident.to_owned(), false),
+            Token::Mut => {
                 let name_token = stream.next();
-                let Some(Token::Identifier(ident)) = name_token else {
+                let Token::Identifier(ident) = name_token else {
                     return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", name_token)))
                 };
                 (ident.to_owned(), true)
             }
-            _ => {
-                return Err(ParsingError::UnexpectedEOF);
-            }
+            Token::EOF => return Err(ParsingError::UnexpectedEOF),
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
         };
 
         let variable_type = if let Some(Token::Colon) = stream.peek(1).get(0) {
             stream.next();
             let maybe_type_token = stream.next();
-            if let Some(Token::Identifier(name)) = maybe_type_token {
+            if let Token::Identifier(name) = maybe_type_token {
                 Type { kind: TypeKind::Ident(Identifier { name: name.to_owned(), mutable: false }) }
             } else {
                 return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", maybe_type_token)));
@@ -103,7 +102,7 @@ impl Parser {
             Type { kind: TypeKind::Infer }
         };
 
-        let variable_declaration_kind = if let Some(Token::Eq) = stream.next() {
+        let variable_declaration_kind = if let Token::Eq = stream.next() {
             VariableDeclarationKind::Init(Parser::parse_expression(stream)?)
         } else {
             VariableDeclarationKind::Declaration
@@ -154,15 +153,15 @@ impl Parser {
 
         loop {
             let arg_name = match stream.next() {
-                Some(Token::Identifier(name)) => name.to_owned(),
-                Some(token) => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
-                None => return Err(ParsingError::UnexpectedEOF)
+                Token::Identifier(name) => name.to_owned(),
+                Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                token => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
             };
             Parser::expect_token(stream.next(), Token::Colon)?;
             let arg_type = match stream.next() {
-                Some(Token::Identifier(type_name)) => type_name.to_owned(),
-                Some(token) => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
-                None => return Err(ParsingError::UnexpectedEOF)
+                Token::Identifier(type_name) => type_name.to_owned(),
+                Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                token => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
             };
 
             let arg = FunctionArg {
@@ -172,10 +171,10 @@ impl Parser {
             args.push(arg);
 
             match stream.next() {
-                Some(Token::Comma) => continue,
-                Some(Token::ParenClose) => break,
-                Some(token) => return Err(ParsingError::UnexpectedToken(token.clone())),
-                None => return Err(ParsingError::UnexpectedEOF),
+                Token::Comma => continue,
+                Token::ParenClose => break,
+                Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                token => return Err(ParsingError::UnexpectedToken(token.clone())),
             }
         }
         
@@ -207,14 +206,11 @@ impl Parser {
         Ok(block)
     }
 
-    fn expect_token(input: Option<&Token>, expected: Token) -> Result<(), ParsingError> {
+    fn expect_token(input: &Token, expected: Token) -> Result<(), ParsingError> {
         match input {
-            Some(input_tk) => if *input_tk == expected {
-                Ok(())
-            } else {
-                Err(ParsingError::ExpectToken(format!("Expecting token {:?} but got {:?}", expected, input_tk)))
-            }
-            _ => Err(ParsingError::UnexpectedEOF)
+            token if *token == expected => Ok(()),
+            Token::EOF => Err(ParsingError::UnexpectedEOF),
+            token => Err(ParsingError::ExpectToken(format!("Expecting token {:?} but got {:?}", expected, token))),
         }
     }
 }

@@ -46,4 +46,6 @@ pub enum Token {
     Float(f64),
     String(String),
     Boolean(bool),
+
+    EOF
 }
