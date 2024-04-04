@@ -1,4 +1,4 @@
-use crate::parser::ast::{Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
+use crate::parser::ast::{Block, Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
 
 #[derive(Debug)]
 pub struct CompileError(String);
@@ -42,6 +42,18 @@ impl Compiler {
                 LiteralKind::Float(value) => Ok(value.to_string()),
                 LiteralKind::Int(value) => Ok(value.to_string())
             }
+            ExpressionKind::Function(function) => {
+                let args: Vec<String> = function.args.iter().map(|arg| arg.identifier.name.clone()).collect();
+                Ok(format!("({}) => {{\n{}}}", args.join(", "), Compiler::compile_block(function.body)?))
+            }
         }
+    }
+
+    fn compile_block(block: Block) -> Result<String, CompileError> {
+        let mut result = String::new();
+        for statement in block.statements {
+            result.push_str(&Compiler::compile_statement(statement)?);
+        }
+        Ok(result)
     }
 }

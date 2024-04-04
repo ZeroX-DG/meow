@@ -43,7 +43,25 @@ pub struct Expression {
 
 #[derive(Debug)]
 pub enum ExpressionKind {
-    Literal(Literal)
+    Literal(Literal),
+    Function(Function)
+}
+
+#[derive(Debug)]
+pub struct Function {
+    pub args: Vec<FunctionArg>,
+    pub body: Block
+}
+
+#[derive(Debug)]
+pub struct FunctionArg {
+    pub identifier: Identifier,
+    pub arg_type: Type,
+}
+
+#[derive(Debug)]
+pub struct Block {
+    pub statements: Vec<Statement>
 }
 
 #[derive(Debug)]
