@@ -24,14 +24,14 @@ impl Compiler {
             StatementKind::Let(declaration) => Compiler::compile_variable_declaration(declaration)?,
             StatementKind::Expr(expression) => Compiler::compile_expression(expression)?,
         };
-        Ok(format!("{}\n", result))
+        Ok(format!("{};\n", result))
     }
 
     fn compile_variable_declaration(declaration: VariableDeclaration) -> Result<String, CompileError> {
         let declaration_keyword = if declaration.identifier.mutable { "let" } else { "const" };
         match declaration.kind {
-            VariableDeclarationKind::Declaration => Ok(format!("{} {};", declaration_keyword, declaration.identifier.name)),
-            VariableDeclarationKind::Init(expression) => Ok(format!("{} {} = {};", declaration_keyword, declaration.identifier.name, Compiler::compile_expression(expression)?))
+            VariableDeclarationKind::Declaration => Ok(format!("{} {}", declaration_keyword, declaration.identifier.name)),
+            VariableDeclarationKind::Init(expression) => Ok(format!("{} {} = {}", declaration_keyword, declaration.identifier.name, Compiler::compile_expression(expression)?))
         }
     }
 
@@ -45,10 +45,17 @@ impl Compiler {
             }
             ExpressionKind::Function(function) => {
                 let args: Vec<String> = function.args.iter().map(|arg| arg.identifier.name.clone()).collect();
-                Ok(format!("({}) => {{\n{}}}", args.join(", "), Compiler::compile_block(function.body)?))
+                Ok(format!("({}) => {}", args.join(", "), Compiler::compile_block(function.body)?))
             }
             ExpressionKind::PropertyAccess(path) => {
                 Ok(path.iter().map(|ident| ident.name.to_owned()).collect::<Vec<String>>().join("."))
+            }
+            ExpressionKind::Call(property_access, args) => {
+                let mut compiled_args = Vec::new();
+                for arg in args {
+                    compiled_args.push(Compiler::compile_expression(arg)?);
+                }
+                Ok(format!("{}({})", Compiler::compile_expression(*property_access)?, compiled_args.join(", ")))
             }
         }
     }
@@ -56,8 +63,8 @@ impl Compiler {
     fn compile_block(block: Block) -> Result<String, CompileError> {
         let mut result = String::new();
         for statement in block.statements {
-            result.push_str(&Compiler::compile_statement(statement)?);
+            result.push_str(&format!("  {}", Compiler::compile_statement(statement)?));
         }
-        Ok(result)
+        Ok(format!("{{\n{}}}", result))
     }
 }

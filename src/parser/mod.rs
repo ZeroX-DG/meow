@@ -49,12 +49,13 @@ impl Parser {
         
         while let Some(token) = stream.peek(1).get(0).cloned() {
             match token {
-                Token::Let => {
+                Token::Let | Token::Identifier(_) => {
                     let item = Item {
                         kind: ItemKind::Statement(Parser::parse_statement(&mut stream)?)
                     };
                     parser.program.items.push(item);
                 }
+                Token::EOF => break,
                 _ => {
                     return Err(ParsingError::UnexpectedToken(token.clone()))
                 }
@@ -71,8 +72,7 @@ impl Parser {
             _ => StatementKind::Expr(Parser::parse_expression(stream)?),
         };
 
-        stream.consume_until(|tk| matches!(tk, Token::SemiConlon));
-
+        Parser::expect_token(stream.next(), Token::SemiConlon)?;
         Ok(Statement { kind })
     }
 
@@ -141,9 +141,32 @@ impl Parser {
                 Token::Identifier(_) => {
                     let property_path = Parser::parse_property_access_expression(stream)?;
                     match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
-                        Token::SemiConlon => ExpressionKind::PropertyAccess(property_path),
+                        Token::ParenOpen => {
+                            stream.next();
+                            let property_access = Expression { kind: ExpressionKind::PropertyAccess(property_path) };
+                            let mut args = Vec::new();
+                            loop {
+                                match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
+                                    Token::ParenClose => {
+                                        stream.next();
+                                        break;
+                                    },
+                                    _ => {
+                                        args.push(Parser::parse_expression(stream)?);
+
+                                        match stream.next() {
+                                            Token::Comma => continue,
+                                            Token::ParenClose => break,
+                                            Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                                            token => return Err(ParsingError::UnexpectedToken(token.clone()))
+                                        }
+                                    }
+                                }
+                            }
+                            ExpressionKind::Call(Box::new(property_access), args)
+                        }
                         Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                        token => return Err(ParsingError::UnexpectedToken(token.clone()))
+                        _ => ExpressionKind::PropertyAccess(property_path),
                     }
                 },
                 _ => return Err(ParsingError::UnexpectedToken(token.clone()))

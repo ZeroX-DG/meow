@@ -46,7 +46,8 @@ pub struct Expression {
 pub enum ExpressionKind {
     Literal(Literal),
     Function(Function),
-    PropertyAccess(Vec<Identifier>)
+    PropertyAccess(Vec<Identifier>),
+    Call(Box<Expression>, Vec<Expression>)
 }
 
 #[derive(Debug)]
