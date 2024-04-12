@@ -99,7 +99,7 @@ impl Parser {
 
         let variable_type = match stream.peek() {
             Token::Colon => {
-                stream.next(); // Consume the colon
+                stream.next(); // Consume Colon
                 let path = Parser::parse_path(stream)?;
                 Type { kind: TypeKind::TypePath(path) }
             }
@@ -107,10 +107,12 @@ impl Parser {
             token => return Err(ParsingError::UnexpectedToken(token.clone()))
         };
 
-        let variable_declaration_kind = if let Token::Eq = stream.next() {
-            VariableDeclarationKind::Init(Parser::parse_expression(stream)?)
-        } else {
-            VariableDeclarationKind::Declaration
+        let variable_declaration_kind = match stream.peek() {
+            Token::Eq => {
+                stream.next(); // Consume Eq
+                VariableDeclarationKind::Init(Parser::parse_expression(stream)?)
+            },
+            _ => VariableDeclarationKind::Declaration
         };
 
         let variable_declaration = VariableDeclaration {
@@ -188,5 +190,50 @@ impl Parser {
         };
 
         Ok(Expression { kind })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_empty_program() {
+        let tokens = vec![];
+        let ast = Parser::parse(tokens).expect("Failed to parse tokens");
+        let expected = Program {
+            items: Vec::new()
+        };
+        assert_eq!(ast, expected)
+    }
+
+    #[test]
+    fn test_parse_variable_declaration() {
+        // let mut hello: string;
+        let tokens = vec![
+            Token::Let,
+            Token::Mut,
+            Token::Identifier(String::from("hello")),
+            Token::Colon,
+            Token::Identifier(String::from("string")),
+            Token::SemiConlon,
+            Token::EOF
+        ];
+        let ast = Parser::parse(tokens).expect("Failed to parse tokens");
+        let expected = Program {
+            items: vec![
+                Item{
+                    kind: ItemKind::Statement(Statement { kind: StatementKind::Let(VariableDeclaration {
+                        variable_type: Type {
+                            kind: TypeKind::TypePath(Path { segments: vec![PathSegment { ident: Identifier { name: String::from("string") } }] })
+                        },
+                        identifier: Identifier { name: String::from("hello") },
+                        kind: VariableDeclarationKind::Declaration,
+                        is_mutable: true
+                    })}) 
+                }
+            ]
+        };
+        assert_eq!(ast, expected)
     }
 }
