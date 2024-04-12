@@ -1,4 +1,4 @@
-use crate::{lexer::Token, stream::ParsingStream};
+use crate::{lexer::{Token, TokenType}, stream::ParsingStream};
 
 use super::{ast::Identifier, Parser, ParsingError};
 
@@ -14,7 +14,7 @@ pub struct PathSegment {
 
 /// Parse a path with syntax:
 /// Path = <PathSegment> + (:: + <PathSegment>)*
-pub fn parse_path(stream: &mut ParsingStream<&Token>) -> Result<Path, ParsingError> {
+pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingError> {
     let mut path = Path {
         segments: Vec::new()
     };
@@ -23,8 +23,8 @@ pub fn parse_path(stream: &mut ParsingStream<&Token>) -> Result<Path, ParsingErr
         let segment = parse_path_segment(stream)?;
         path.segments.push(segment);
 
-        match stream.peek() {
-            Token::ColonColon => { stream.next(); }
+        match stream.peek().token_type {
+            TokenType::ColonColon => { stream.next(); }
             _ => break
         }
     }
@@ -34,31 +34,27 @@ pub fn parse_path(stream: &mut ParsingStream<&Token>) -> Result<Path, ParsingErr
 
 /// Parse a path with syntax:
 /// PathSegment = <Identifier>
-pub fn parse_path_segment(stream: &mut ParsingStream<&Token>) -> Result<PathSegment, ParsingError> {
+pub fn parse_path_segment(stream: &mut ParsingStream<Token>) -> Result<PathSegment, ParsingError> {
     let ident = Parser::parse_identifier(stream)?;
     Ok(PathSegment{ ident })
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::parser::tests::assert_parsing_result;
+
     use super::*;
 
     #[test]
     fn test_parse_path() {
         // std::string
-        let tokens = vec![
-            Token::Identifier(String::from("std")),
-            Token::ColonColon,
-            Token::Identifier(String::from("string")),
-        ];
-
-        let mut iter = tokens.iter();
-        let mut stream = ParsingStream::new(&mut iter, &Token::EOF);
-
-        let path = parse_path(&mut stream);
-        assert_eq!(path, Ok(Path { segments: vec![
-            PathSegment { ident: Identifier { name: String::from("std") } },
-            PathSegment { ident: Identifier { name: String::from("string") } },
-        ]}))
+        assert_parsing_result(
+            vec![TokenType::Identifier(String::from("std")), TokenType::ColonColon, TokenType::Identifier(String::from("string"))],
+            parse_path,
+            Ok(Path { segments: vec![
+                PathSegment { ident: Identifier { name: String::from("std") } },
+                PathSegment { ident: Identifier { name: String::from("string") } },
+            ]})
+        );
     }
 }

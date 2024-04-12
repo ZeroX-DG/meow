@@ -1,4 +1,4 @@
-use crate::{lexer::Token, stream::ParsingStream};
+use crate::{lexer::{Token, TokenType}, span::Span, stream::ParsingStream};
 
 use super::ParsingError;
 
@@ -14,7 +14,8 @@ pub enum ExpressionKind {
 
 #[derive(Debug, PartialEq)]
 pub struct Literal {
-    pub kind: LiteralKind
+    pub kind: LiteralKind,
+    pub span: Span,
 }
 
 #[derive(Debug, PartialEq)]
@@ -27,30 +28,32 @@ pub enum LiteralKind {
 
 /// Parse an expression with syntax:
 /// Expression = <LiteralExpression>
-pub fn parse_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
-    match stream.peek() {
-        Token::Boolean(_) | Token::Int(_) | Token::Float(_) | Token::String(_) => parse_literal_expression(stream),
-        token => return Err(ParsingError::UnexpectedToken(token.clone()))
+pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    let token = stream.peek();
+    match token.token_type {
+        TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => parse_literal_expression(stream),
+        _ => return Err(ParsingError::UnexpectedToken(token.clone()))
     }
 }
 
 /// Parse a literal expression with syntax:
 /// LiteralExpression = <Boolean> | <Int> | <Float> | <String>
-pub fn parse_literal_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
-    let kind = match stream.next() {
-        Token::Boolean(value) => {
-            ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value) })
+pub fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    let token = stream.next();
+    let kind = match &token.token_type {
+        TokenType::Boolean(value) => {
+            ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value), span: token.span })
         },
-        Token::Int(value) => {
-            ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value) })
+        TokenType::Int(value) => {
+            ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value), span: token.span })
         },
-        Token::Float(value) => {
-            ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value) })
+        TokenType::Float(value) => {
+            ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value), span: token.span })
         },
-        Token::String(value) => {
-            ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
+        TokenType::String(value) => {
+            ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()), span: token.span })
         },
-        token => return Err(ParsingError::UnexpectedToken(token.clone()))
+        _ => return Err(ParsingError::UnexpectedToken(token.clone()))
     };
 
     Ok(Expression { kind })
@@ -58,45 +61,61 @@ pub fn parse_literal_expression(stream: &mut ParsingStream<&Token>) -> Result<Ex
 
 #[cfg(test)]
 mod tests {
+    use crate::{parser::tests::assert_parsing_result, span::Span};
+
     use super::*;
 
     #[test]
     fn test_parse_literal_expression() {
+        let span = Span::from(((0, 0), (0, 0)));
         //  "hello"
-        assert_literal_expression(
-            vec![Token::String(String::from("hello"))],
-            Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::String(String::from("hello")) }) }
+        assert_parsing_result(
+            vec![TokenType::String(String::from("hello"))],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal {
+                kind: LiteralKind::String(String::from("hello")),
+                span: span.clone(),
+            })})
         );
 
         // 12
-        assert_literal_expression(
-            vec![Token::Int(12)],
-            Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(12) }) }
+        assert_parsing_result(
+            vec![TokenType::Int(12)],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal {
+                kind: LiteralKind::Int(12),
+                span: span.clone(),
+            })})
         );
 
         // 47.2821
-        assert_literal_expression(
-            vec![Token::Float(47.2821)],
-            Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Float(47.2821) }) }
+        assert_parsing_result(
+            vec![TokenType::Float(47.2821)],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal {
+                kind: LiteralKind::Float(47.2821),
+                span: span.clone(),
+            })})
         );
 
         // true
-        assert_literal_expression(
-            vec![Token::Boolean(true)],
-            Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(true) }) }
+        assert_parsing_result(
+            vec![TokenType::Boolean(true)],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal {
+                kind: LiteralKind::Boolean(true),
+                span: span.clone(),
+            })})
         );
 
         // false
-        assert_literal_expression(
-            vec![Token::Boolean(false)],
-            Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(false) }) }
+        assert_parsing_result(
+            vec![TokenType::Boolean(false)],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal {
+                kind: LiteralKind::Boolean(false),
+                span: span.clone(),
+            })})
         );
-    }
-
-    fn assert_literal_expression(tokens: Vec<Token>, expected: Expression) {
-        let mut iter = tokens.iter();
-        let mut stream = ParsingStream::new(&mut iter, &Token::EOF);
-        let expression = parse_literal_expression(&mut stream);
-        assert_eq!(expression, Ok(expected))
     }
 }

@@ -5,11 +5,11 @@ mod statement;
 
 use std::fmt::Debug;
 
-use crate::stream::ParsingStream;
+use crate::{span::Span, stream::ParsingStream};
 
 use self::ast::{Identifier, Item, ItemKind, Program};
 
-use super::lexer::Token;
+use super::lexer::{Token, TokenType};
 
 #[derive(PartialEq)]
 pub enum ParsingError {
@@ -28,9 +28,9 @@ impl Debug for ParsingError {
 
 macro_rules! expect_token {
     ($x:expr, $y:pat) => {
-        match $x {
+        match &$x.token_type {
             $y => {}
-            token => return Err(ParsingError::UnexpectedToken(token.clone()))
+            _ => return Err(ParsingError::UnexpectedToken($x.clone()))
         }
     };
 }
@@ -53,13 +53,16 @@ impl Parser {
     /// Parse at the top level of the program
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
-        let mut tokens_iter = tokens.iter();
-        let mut stream = ParsingStream::new(&mut tokens_iter, &Token::EOF);
+        let mut tokens_iter = tokens.into_iter();
+        let mut stream = ParsingStream::new(&mut tokens_iter, Token {
+            token_type: TokenType::EOF,
+            span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
+        });
         
         loop {
             let token = stream.peek();
 
-            if let Token::EOF = token {
+            if let TokenType::EOF = token.token_type {
                 break;
             }
 
@@ -74,10 +77,11 @@ impl Parser {
 
     /// Parse an identiifier with syntax:
     /// Identifier = <Identifier>
-    fn parse_identifier(stream: &mut ParsingStream<&Token>) -> Result<Identifier, ParsingError> {
-        match stream.next() {
-            Token::Identifier(ident) => Ok(Identifier { name: ident.clone() }),
-            token => Err(ParsingError::UnexpectedToken(token.clone()))
+    fn parse_identifier(stream: &mut ParsingStream<Token>) -> Result<Identifier, ParsingError> {
+        let token = stream.next();
+        match token.token_type {
+            TokenType::Identifier(ident) => Ok(Identifier { name: ident.clone() }),
+            _ => Err(ParsingError::UnexpectedToken(token.clone()))
         }
     }
 }
@@ -86,9 +90,30 @@ impl Parser {
 mod tests {
     use super::*;
 
+    pub fn assert_parsing_result<T, F>(token_types: Vec<TokenType>, parsing_fn: F, expected: Result<T, ParsingError>)
+        where
+            F: Fn(&mut ParsingStream<Token>) -> Result<T, ParsingError>,
+            T: PartialEq + Debug
+    {
+        let tokens = token_types.into_iter()
+            .map(|token_type| Token { token_type, span: Span::from(((0, 0), (0, 0))) })
+            .collect::<Vec<Token>>();
+        let mut iter = tokens.into_iter();
+        let mut stream = ParsingStream::new(&mut iter, Token {
+            token_type: TokenType::EOF,
+            span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
+        });
+        assert_eq!(parsing_fn(&mut stream), expected)
+    }
+
     #[test]
     fn test_parse_empty_program() {
-        let tokens = vec![Token::EOF];
+        let tokens = vec![
+            Token {
+                token_type: TokenType::EOF,
+                span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
+            }
+        ];
         let ast = Parser::parse(tokens).expect("Failed to parse tokens");
         let expected = Program {
             items: Vec::new()
