@@ -14,6 +14,22 @@ pub struct Expression {
 #[derive(Debug, PartialEq)]
 pub enum ExpressionKind {
     Literal(Literal),
+    BinaryOp(BinaryOp),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BinaryOp {
+    pub op: Operator,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Operator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide
 }
 
 #[derive(Debug, PartialEq)]
@@ -31,20 +47,64 @@ pub enum LiteralKind {
 }
 
 /// Parse an expression with syntax:
-/// Expression = <LiteralExpression>
+/// Expression = <LiteralExpression> | <BinaryOperationExpression>
 pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    parse_expression_binding_power(stream, 0)
+}
+
+/// Parse an expression with a specified min binding power for Pratt parsing.
+fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding_power: u8) -> Result<Expression, ParsingError> {
     let token = stream.peek();
-    match token.token_type {
+    let mut left = match token.token_type {
         TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => {
-            parse_literal_expression(stream)
+            parse_literal_expression(stream)?
         }
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+    };
+
+    loop {
+        let token = stream.peek();
+        let op = match token.token_type {
+            TokenType::EOF => break,
+            TokenType::Plus => Operator::Add,
+            TokenType::Minus => Operator::Subtract,
+            TokenType::Multiply => Operator::Multiply,
+            TokenType::Divide => Operator::Divide,
+            _ => return Err(ParsingError::UnexpectedToken(token.clone()))
+        };
+
+        let (left_binding_power, right_binding_power) = infix_binding_power(&op);
+
+        if left_binding_power < min_binding_power {
+            break;
+        }
+
+        stream.next();
+        let right = parse_expression_binding_power(stream, right_binding_power)?;
+
+        left = Expression {
+            kind: ExpressionKind::BinaryOp(BinaryOp {
+                left: Box::new(left),
+                right: Box::new(right),
+                op
+            })
+        }
+    }
+
+    Ok(left)
+}
+
+/// Binding power for infix ooperators like add, subtract, etc.
+fn infix_binding_power(op: &Operator) -> (u8, u8) {
+    match op {
+        Operator::Add | Operator::Subtract => (1, 2),
+        Operator::Multiply | Operator::Divide => (3, 4),
     }
 }
 
 /// Parse a literal expression with syntax:
 /// LiteralExpression = <Boolean> | <Int> | <Float> | <String>
-pub fn parse_literal_expression(
+fn parse_literal_expression(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Expression, ParsingError> {
     let token = stream.next();
@@ -138,6 +198,31 @@ mod tests {
                     span: span.clone(),
                 }),
             }),
+        );
+    }
+
+    #[test]
+    fn test_parse_simple_binary_op() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::Int(1),
+                TokenType::Plus,
+                TokenType::Int(2),
+                TokenType::Multiply,
+                TokenType::Int(3),
+                TokenType::EOF
+            ],
+            parse_expression,
+            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                op: Operator::Add,
+                left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(1), span: span.clone() }) }),
+                right: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Multiply,
+                    left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(2), span: span.clone() }) }),
+                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
+                })})
+            })})
         );
     }
 }
