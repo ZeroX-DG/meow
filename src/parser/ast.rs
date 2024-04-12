@@ -1,5 +1,6 @@
 pub use super::path::{Path, PathSegment};
 pub use super::expression::{Expression, ExpressionKind, Literal, LiteralKind};
+pub use super::statement::{Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
@@ -14,31 +15,6 @@ pub struct Item {
 #[derive(Debug, PartialEq)]
 pub enum ItemKind {
     Statement(Statement),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Statement {
-    pub kind: StatementKind
-}
-
-#[derive(Debug, PartialEq)]
-pub enum StatementKind {
-    Let(VariableDeclaration),
-    Expr(Expression)
-}
-
-#[derive(Debug, PartialEq)]
-pub struct VariableDeclaration {
-    pub identifier: Identifier,
-    pub variable_type: Type,
-    pub kind: VariableDeclarationKind,
-    pub is_mutable: bool
-}
-
-#[derive(Debug, PartialEq)]
-pub enum VariableDeclarationKind {
-    Declaration,
-    Init(Expression),
 }
 
 #[derive(Debug, PartialEq)]
