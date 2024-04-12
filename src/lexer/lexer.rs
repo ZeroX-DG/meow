@@ -4,7 +4,7 @@ use super::token::Token;
 
 macro_rules! peek_next {
     ($stream:ident, $x:expr) => {
-        matches!($stream.peek(1).get(0), Some($x))
+        matches!($stream.peek(), $x)
     };
 }
 
@@ -91,11 +91,13 @@ impl Lexer {
                 ';' => lexer.push_token(Token::SemiConlon),
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let mut content = String::from(ch);
-                    while let Some(c) = stream.peek(1).get(0) {
-                        if !c.is_alphanumeric() && *c != '_' {
+
+                    loop {
+                        let c = stream.peek();
+                        if !c.is_alphanumeric() && c != '_' {
                             break;
                         }
-                        content.push(*c);
+                        content.push(c);
                         stream.next();
                     }
 
@@ -138,7 +140,8 @@ impl Lexer {
                 }
                 '\'' => {
                     let mut content = String::new();
-                    while let Some(c) = stream.peek(1).get(0).cloned() {
+                    loop {
+                        let c = stream.peek();
                         if c == '\\' {
                             stream.next();
                             let c2 = stream.next();
@@ -168,14 +171,15 @@ impl Lexer {
                 '0'..='9' => {
                     let mut content = String::from(ch);
                     let mut is_float = false;
-                    while let Some(c) = stream.peek(1).get(0) {
-                        if !c.is_numeric() && *c != '.' {
+                    loop {
+                        let c = stream.peek();
+                        if !c.is_numeric() && c != '.' {
                             break;
                         }
-                        if *c == '.' {
+                        if c == '.' {
                             is_float = true;
                         }
-                        content.push(*c);
+                        content.push(c);
                         stream.next();
                     }
                     let token = if is_float {
@@ -222,6 +226,7 @@ mod tests {
             Token::Comma,
             Token::Colon,
             Token::SemiConlon,
+            Token::EOF
         ]);
     }
 
@@ -246,7 +251,8 @@ mod tests {
             Token::LessThan,
             Token::GreaterEq,
             Token::LessEq,
-            Token::FatArrow
+            Token::FatArrow,
+            Token::EOF
         ]);
     }
 
@@ -260,7 +266,8 @@ mod tests {
             Token::Mut,
             Token::Let,
             Token::Identifier("_something_else20".to_string()),
-            Token::Return
+            Token::Return,
+            Token::EOF
         ]);
     }
 
@@ -273,6 +280,7 @@ mod tests {
             Token::Identifier("hello".to_string()),
             Token::Eq,
             Token::String("Hi! I'm Hung".to_string()),
+            Token::EOF
         ]);
     }
 
@@ -285,6 +293,7 @@ mod tests {
             Token::Identifier("isAwesome".to_string()),
             Token::Eq,
             Token::Boolean(true),
+            Token::EOF
         ]);
     }
 
@@ -297,6 +306,7 @@ mod tests {
             Token::Identifier("age".to_string()),
             Token::Eq,
             Token::Float(10.5235),
+            Token::EOF
         ]);
     }
 
@@ -309,6 +319,7 @@ mod tests {
             Token::Identifier("age".to_string()),
             Token::Eq,
             Token::Int(22),
+            Token::EOF
         ]);
     }
 }

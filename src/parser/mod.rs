@@ -47,7 +47,8 @@ impl Parser {
         let mut tokens_iter = tokens.iter();
         let mut stream = ParsingStream::new(&mut tokens_iter, &Token::EOF);
         
-        while let Some(token) = stream.peek(1).get(0).cloned() {
+        loop {
+            let token = stream.peek();
             match token {
                 Token::Let | Token::Identifier(_) => {
                     let item = Item {
@@ -66,7 +67,7 @@ impl Parser {
     }
 
     fn parse_statement(stream: &mut ParsingStream<&Token>) -> Result<Statement, ParsingError> {
-        let kind = match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
+        let kind = match stream.peek() {
             Token::Let => StatementKind::Let(Parser::parse_variable_declaration(stream)?),
             Token::EOF => return Err(ParsingError::UnexpectedEOF),
             _ => StatementKind::Expr(Parser::parse_expression(stream)?),
@@ -91,7 +92,7 @@ impl Parser {
             token => return Err(ParsingError::UnexpectedToken(token.clone()))
         };
 
-        let variable_type = if let Some(Token::Colon) = stream.peek(1).get(0) {
+        let variable_type = if let Token::Colon = stream.peek() {
             stream.next();
             let maybe_type_token = stream.next();
             if let Token::Identifier(name) = maybe_type_token {
@@ -119,59 +120,56 @@ impl Parser {
     }
 
     fn parse_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
-        let kind = match stream.peek(1).get(0).cloned() {
-            Some(token) => match token {
-                Token::Boolean(value) => {
-                    stream.next();
-                    ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value) })
-                },
-                Token::Int(value) => {
-                    stream.next();
-                    ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value) })
-                },
-                Token::Float(value) => {
-                    stream.next();
-                    ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value) })
-                },
-                Token::String(value) => {
-                    stream.next();
-                    ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
-                },
-                Token::Function => ExpressionKind::Function(Parser::parse_function_expression(stream)?),
-                Token::Identifier(_) => {
-                    let property_path = Parser::parse_property_access_expression(stream)?;
-                    match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
-                        Token::ParenOpen => {
-                            stream.next();
-                            let property_access = Expression { kind: ExpressionKind::PropertyAccess(property_path) };
-                            let mut args = Vec::new();
-                            loop {
-                                match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
-                                    Token::ParenClose => {
-                                        stream.next();
-                                        break;
-                                    },
-                                    _ => {
-                                        args.push(Parser::parse_expression(stream)?);
+        let kind = match stream.peek() {
+            Token::Boolean(value) => {
+                stream.next();
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value) })
+            },
+            Token::Int(value) => {
+                stream.next();
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value) })
+            },
+            Token::Float(value) => {
+                stream.next();
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value) })
+            },
+            Token::String(value) => {
+                stream.next();
+                ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
+            },
+            Token::Function => ExpressionKind::Function(Parser::parse_function_expression(stream)?),
+            Token::Identifier(_) => {
+                let property_path = Parser::parse_property_access_expression(stream)?;
+                match stream.peek() {
+                    Token::ParenOpen => {
+                        stream.next();
+                        let property_access = Expression { kind: ExpressionKind::PropertyAccess(property_path) };
+                        let mut args = Vec::new();
+                        loop {
+                            match stream.peek() {
+                                Token::ParenClose => {
+                                    stream.next();
+                                    break;
+                                },
+                                _ => {
+                                    args.push(Parser::parse_expression(stream)?);
 
-                                        match stream.next() {
-                                            Token::Comma => continue,
-                                            Token::ParenClose => break,
-                                            Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                                            token => return Err(ParsingError::UnexpectedToken(token.clone()))
-                                        }
+                                    match stream.next() {
+                                        Token::Comma => continue,
+                                        Token::ParenClose => break,
+                                        Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                                        token => return Err(ParsingError::UnexpectedToken(token.clone()))
                                     }
                                 }
                             }
-                            ExpressionKind::Call(Box::new(property_access), args)
                         }
-                        Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                        _ => ExpressionKind::PropertyAccess(property_path),
+                        ExpressionKind::Call(Box::new(property_access), args)
                     }
-                },
-                _ => return Err(ParsingError::UnexpectedToken(token.clone()))
-            }
-            _ => return Err(ParsingError::UnexpectedEOF)
+                    Token::EOF => return Err(ParsingError::UnexpectedEOF),
+                    _ => ExpressionKind::PropertyAccess(property_path),
+                }
+            },
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
         };
         let expression = Expression { kind };
         Ok(expression)
@@ -180,7 +178,7 @@ impl Parser {
     fn parse_property_access_expression(stream: &mut ParsingStream<&Token>) -> Result<Vec<Identifier>, ParsingError> {
         let mut path = Vec::new();
         loop {
-            match stream.peek(1).get(0).cloned().unwrap_or(&Token::EOF) {
+            match stream.peek() {
                 Token::Identifier(ident) => {
                     path.push(Identifier { mutable: false, name: ident.clone() });
                     stream.next();
@@ -241,7 +239,7 @@ impl Parser {
         let mut statements = Vec::new();
 
         loop {
-            if let Some(Token::CurlyBracketClose) = stream.peek(1).get(0) {
+            if let Token::CurlyBracketClose = stream.peek() {
                 stream.next();
                 break;
             }

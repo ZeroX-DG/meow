@@ -1,7 +1,5 @@
-use std::collections::VecDeque;
-
 pub struct ParsingStream<'a, T: PartialEq + Clone> {
-    buffer: VecDeque<T>,
+    next_item: T,
     input: &'a mut dyn Iterator<Item=T>,
     stream_end_item: T
 }
@@ -9,18 +7,17 @@ pub struct ParsingStream<'a, T: PartialEq + Clone> {
 impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
     pub fn new(input: &'a mut dyn Iterator<Item=T>, stream_end_item: T) -> Self {
         Self {
-            buffer: VecDeque::new(),
+            next_item: input.next().unwrap_or(stream_end_item.clone()),
             input,
             stream_end_item
         }
     }
 
     pub fn next(&mut self) -> T {
-        if !self.buffer.is_empty() {
-            let consumed = self.buffer.pop_front();
-            return consumed.unwrap();
-        }
-        self.input.next().unwrap_or(self.stream_end_item.clone())
+        let result = self.next_item.clone();
+        self.next_item = self.input.next().unwrap_or(self.stream_end_item.clone());
+        
+        result
     }
 
     pub fn consume_until<F: Fn(&T) -> bool>(&mut self, cond: F) {
@@ -36,19 +33,7 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
         }
     }
 
-    pub fn peek(&mut self, amount: usize) -> &VecDeque<T> {
-        let buffer_size = self.buffer.len();
-
-        if amount < buffer_size {
-            return &self.buffer;
-        }
-
-        let consume_amount = amount - buffer_size;
-        for _ in 0..consume_amount {
-            if let Some(item) = self.input.next() {
-                self.buffer.push_back(item);
-            }
-        }
-        &self.buffer
+    pub fn peek(&mut self) -> T {
+        self.next_item.clone()
     }
 }
