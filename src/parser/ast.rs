@@ -28,7 +28,8 @@ pub enum StatementKind {
 pub struct VariableDeclaration {
     pub identifier: Identifier,
     pub variable_type: Type,
-    pub kind: VariableDeclarationKind
+    pub kind: VariableDeclarationKind,
+    pub is_mutable: bool
 }
 
 #[derive(Debug)]
@@ -82,7 +83,6 @@ pub enum LiteralKind {
 
 #[derive(Debug)]
 pub struct Identifier {
-    pub mutable: bool,
     pub name: String,
 }
 
@@ -94,7 +94,7 @@ pub struct Type {
 #[derive(Debug)]
 pub enum TypeKind {
     Infer,
-    Ident(Identifier)
+    TypePath(Path)
 }
 
 #[derive(Debug)]

@@ -3,30 +3,31 @@ use std::fmt::Debug;
 
 use crate::stream::ParsingStream;
 
-use self::ast::{Block, Expression, ExpressionKind, Function, FunctionArg, Identifier, Item, ItemKind, Literal, LiteralKind, Program, Statement, StatementKind, Type, TypeKind, VariableDeclaration, VariableDeclarationKind};
+use self::ast::{Expression, ExpressionKind, Identifier, Item, ItemKind, Literal, LiteralKind, Path, PathSegment, Program, Statement, StatementKind, Type, TypeKind, VariableDeclaration, VariableDeclarationKind};
 
 use super::lexer::Token;
 
 pub enum ParsingError {
     UnexpectedToken(Token),
-    ExpectToken(String),
-    UnexpectedEOF
 }
 
 impl Debug for ParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParsingError::ExpectToken(error) => {
-                write!(f, "{}", error)
-            }
             ParsingError::UnexpectedToken(token) => {
                 write!(f, "Unexpected token encountered: {:?}", token)
             }
-            ParsingError::UnexpectedEOF => {
-                write!(f, "Unexpected End of File")
-            }
         }
     }
+}
+
+macro_rules! expect_token {
+    ($x:expr, $y:pat) => {
+        match $x {
+            $y => {}
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
+        }
+    };
 }
 
 pub struct Parser {
@@ -42,6 +43,7 @@ impl Parser {
         }
     }
 
+    /// Parse at the top level of the program
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
         let mut tokens_iter = tokens.iter();
@@ -49,59 +51,60 @@ impl Parser {
         
         loop {
             let token = stream.peek();
-            match token {
-                Token::Let | Token::Identifier(_) => {
-                    let item = Item {
-                        kind: ItemKind::Statement(Parser::parse_statement(&mut stream)?)
-                    };
-                    parser.program.items.push(item);
-                }
-                Token::EOF => break,
-                _ => {
-                    return Err(ParsingError::UnexpectedToken(token.clone()))
-                }
+
+            if let Token::EOF = token {
+                break;
             }
+
+            let item = Item {
+                kind: ItemKind::Statement(Parser::parse_statement(&mut stream)?)
+            };
+            parser.program.items.push(item);
         }
 
         return Ok(parser.program)
     }
 
+    /// Parse a statement with syntax:
+    /// Statement = <LetStatement> | <ExpressionStatement> + ;
     fn parse_statement(stream: &mut ParsingStream<&Token>) -> Result<Statement, ParsingError> {
         let kind = match stream.peek() {
             Token::Let => StatementKind::Let(Parser::parse_variable_declaration(stream)?),
-            Token::EOF => return Err(ParsingError::UnexpectedEOF),
             _ => StatementKind::Expr(Parser::parse_expression(stream)?),
         };
 
-        Parser::expect_token(stream.next(), Token::SemiConlon)?;
+        expect_token!(stream.next(), Token::SemiConlon);
         Ok(Statement { kind })
     }
 
+    /// Parse a variable declaration with syntax:
+    /// VariableDeclaration = <Let> + <Identifier> + (<Mut>)? + (: <Type>)? + = + <Expression> + ; 
     fn parse_variable_declaration(stream: &mut ParsingStream<&Token>) -> Result<VariableDeclaration, ParsingError> {
-        Parser::expect_token(stream.next(), Token::Let)?;
-        let (variable_name, is_mutable) = match stream.next() {
-            Token::Identifier(ident) => (ident.to_owned(), false),
-            Token::Mut => {
-                let name_token = stream.next();
-                let Token::Identifier(ident) = name_token else {
-                    return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", name_token)))
-                };
-                (ident.to_owned(), true)
-            }
-            Token::EOF => return Err(ParsingError::UnexpectedEOF),
-            token => return Err(ParsingError::UnexpectedToken(token.clone()))
-        };
+        // Variable declaration start with keyword let
+        expect_token!(stream.next(), Token::Let);
 
-        let variable_type = if let Token::Colon = stream.peek() {
-            stream.next();
-            let maybe_type_token = stream.next();
-            if let Token::Identifier(name) = maybe_type_token {
-                Type { kind: TypeKind::Ident(Identifier { name: name.to_owned(), mutable: false }) }
-            } else {
-                return Err(ParsingError::ExpectToken(format!("Expected Identifier but got: {:?}", maybe_type_token)));
+        let variable_name;
+        let mut is_mutable = false;
+
+        loop {
+            match stream.next() {
+                Token::Mut => { is_mutable = true; }
+                Token::Identifier(identifier) => {
+                    variable_name = identifier.clone();
+                    break;
+                },
+                token => return Err(ParsingError::UnexpectedToken(token.clone()))
             }
-        } else {
-            Type { kind: TypeKind::Infer }
+        }
+
+        let variable_type = match stream.peek() {
+            Token::Colon => {
+                stream.next(); // Consume the colon
+                let path = Parser::parse_path(stream)?;
+                Type { kind: TypeKind::TypePath(path) }
+            }
+            Token::Eq | Token::SemiConlon => Type { kind: TypeKind::Infer },
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
         };
 
         let variable_declaration_kind = if let Token::Eq = stream.next() {
@@ -112,152 +115,78 @@ impl Parser {
 
         let variable_declaration = VariableDeclaration {
             kind: variable_declaration_kind,
-            identifier: Identifier { name: variable_name, mutable: is_mutable },
-            variable_type: variable_type
+            identifier: Identifier { name: variable_name },
+            variable_type,
+            is_mutable
         };
         
         Ok(variable_declaration)
     }
 
-    fn parse_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
-        let kind = match stream.peek() {
-            Token::Boolean(value) => {
-                stream.next();
-                ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value) })
-            },
-            Token::Int(value) => {
-                stream.next();
-                ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value) })
-            },
-            Token::Float(value) => {
-                stream.next();
-                ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value) })
-            },
-            Token::String(value) => {
-                stream.next();
-                ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
-            },
-            Token::Function => ExpressionKind::Function(Parser::parse_function_expression(stream)?),
-            Token::Identifier(_) => {
-                let property_path = Parser::parse_property_access_expression(stream)?;
-                match stream.peek() {
-                    Token::ParenOpen => {
-                        stream.next();
-                        let property_access = Expression { kind: ExpressionKind::PropertyAccess(property_path) };
-                        let mut args = Vec::new();
-                        loop {
-                            match stream.peek() {
-                                Token::ParenClose => {
-                                    stream.next();
-                                    break;
-                                },
-                                _ => {
-                                    args.push(Parser::parse_expression(stream)?);
-
-                                    match stream.next() {
-                                        Token::Comma => continue,
-                                        Token::ParenClose => break,
-                                        Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                                        token => return Err(ParsingError::UnexpectedToken(token.clone()))
-                                    }
-                                }
-                            }
-                        }
-                        ExpressionKind::Call(Box::new(property_access), args)
-                    }
-                    Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                    _ => ExpressionKind::PropertyAccess(property_path),
-                }
-            },
-            token => return Err(ParsingError::UnexpectedToken(token.clone()))
+    /// Parse a path with syntax:
+    /// Path = <PathSegment> + (:: + <PathSegment>)*
+    fn parse_path(stream: &mut ParsingStream<&Token>) -> Result<Path, ParsingError> {
+        let mut path = Path {
+            segments: Vec::new()
         };
-        let expression = Expression { kind };
-        Ok(expression)
-    }
 
-    fn parse_property_access_expression(stream: &mut ParsingStream<&Token>) -> Result<Vec<Identifier>, ParsingError> {
-        let mut path = Vec::new();
         loop {
+            let segment = Parser::parse_path_segment(stream)?;
+            path.segments.push(segment);
+
             match stream.peek() {
-                Token::Identifier(ident) => {
-                    path.push(Identifier { mutable: false, name: ident.clone() });
-                    stream.next();
-                }
-                Token::Period => {
-                    stream.next();
-                },
-                _ => break,
+                Token::ColonColon => { stream.next(); }
+                _ => break
             }
         }
+
         Ok(path)
     }
 
-    fn parse_function_expression(stream: &mut ParsingStream<&Token>) -> Result<Function, ParsingError> {
-        Parser::expect_token(stream.next(), Token::Function)?;
-
-        let mut args: Vec<FunctionArg> = Vec::new();
-        Parser::expect_token(stream.next(), Token::ParenOpen)?;
-
-        loop {
-            let arg_name = match stream.next() {
-                Token::Identifier(name) => name.to_owned(),
-                Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                token => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
-            };
-            Parser::expect_token(stream.next(), Token::Colon)?;
-            let arg_type = match stream.next() {
-                Token::Identifier(type_name) => type_name.to_owned(),
-                Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                token => return Err(ParsingError::ExpectToken(format!("Expecting Identifier but got {:?}", token))),
-            };
-
-            let arg = FunctionArg {
-                identifier: Identifier { name: arg_name, mutable: false },
-                arg_type: Type { kind: TypeKind::Ident(Identifier { name: arg_type, mutable: false }) }
-            };
-            args.push(arg);
-
-            match stream.next() {
-                Token::Comma => continue,
-                Token::ParenClose => break,
-                Token::EOF => return Err(ParsingError::UnexpectedEOF),
-                token => return Err(ParsingError::UnexpectedToken(token.clone())),
-            }
-        }
-        
-        let body = Parser::parse_block(stream)?;
-        let function = Function {
-            args,
-            body
-        };
-
-        Ok(function)
+    /// Parse a path with syntax:
+    /// PathSegment = <Identifier>
+    fn parse_path_segment(stream: &mut ParsingStream<&Token>) -> Result<PathSegment, ParsingError> {
+        let ident = Parser::parse_identifier(stream)?;
+        Ok(PathSegment{ ident })
     }
 
-    fn parse_block(stream: &mut ParsingStream<&Token>) -> Result<Block, ParsingError> {
-        Parser::expect_token(stream.next(), Token::CurlyBracketOpen)?;
-        let mut statements = Vec::new();
-
-        loop {
-            if let Token::CurlyBracketClose = stream.peek() {
-                stream.next();
-                break;
-            }
-            let statement = Parser::parse_statement(stream)?;
-            statements.push(statement);
+    /// Parse an identiifier with syntax:
+    /// Identifier = <Identifier>
+    fn parse_identifier(stream: &mut ParsingStream<&Token>) -> Result<Identifier, ParsingError> {
+        match stream.next() {
+            Token::Identifier(ident) => Ok(Identifier { name: ident.clone() }),
+            token => Err(ParsingError::UnexpectedToken(token.clone()))
         }
-
-        let block = Block {
-            statements
-        };
-        Ok(block)
     }
 
-    fn expect_token(input: &Token, expected: Token) -> Result<(), ParsingError> {
-        match input {
-            token if *token == expected => Ok(()),
-            Token::EOF => Err(ParsingError::UnexpectedEOF),
-            token => Err(ParsingError::ExpectToken(format!("Expecting token {:?} but got {:?}", expected, token))),
+    /// Parse an expression with syntax:
+    /// Expression = <LiteralExpression>
+    fn parse_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
+        match stream.peek() {
+            Token::Boolean(_) | Token::Int(_) | Token::Float(_) | Token::String(_) => Parser::parse_literal_expression(stream),
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
         }
+    }
+
+    /// Parse a literal expression with syntax:
+    /// LiteralExpression = <Boolean> | <Int> | <Float> | <String>
+    fn parse_literal_expression(stream: &mut ParsingStream<&Token>) -> Result<Expression, ParsingError> {
+        let kind = match stream.next() {
+            Token::Boolean(value) => {
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Boolean(*value) })
+            },
+            Token::Int(value) => {
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Int(*value) })
+            },
+            Token::Float(value) => {
+                ExpressionKind::Literal(Literal { kind: LiteralKind::Float(*value) })
+            },
+            Token::String(value) => {
+                ExpressionKind::Literal(Literal { kind: LiteralKind::String(value.to_owned()) })
+            },
+            token => return Err(ParsingError::UnexpectedToken(token.clone()))
+        };
+
+        Ok(Expression { kind })
     }
 }
