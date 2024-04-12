@@ -1,5 +1,13 @@
+use crate::span::Span;
+
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub struct Token {
+    pub span: Span,
+    pub token_type: TokenType
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
     Identifier(String),
 
     // Keywords

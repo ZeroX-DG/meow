@@ -20,7 +20,7 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
         result
     }
 
-    pub fn consume_until<F: Fn(&T) -> bool>(&mut self, cond: F) {
+    pub fn consume_until<F: FnMut(&T) -> bool>(&mut self, mut cond: F) {
         loop {
             let item = self.next();
             if cond(&item) {

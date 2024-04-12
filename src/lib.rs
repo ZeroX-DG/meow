@@ -2,6 +2,7 @@ mod lexer;
 mod parser;
 mod compiler;
 mod stream;
+mod span;
 
 use compiler::Compiler;
 use lexer::Lexer;
