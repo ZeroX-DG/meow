@@ -1,4 +1,7 @@
-use crate::{span::{LineColumn, Span}, stream::ParsingStream};
+use crate::{
+    span::{LineColumn, Span},
+    stream::ParsingStream,
+};
 
 use super::token::{Token, TokenType};
 
@@ -12,7 +15,7 @@ macro_rules! peek_next {
 pub enum LexingError {
     UnexpectedCharacter(char),
     InvalidFloatingNumberFormat,
-    InvalidIntFormat
+    InvalidIntFormat,
 }
 
 pub struct Lexer {
@@ -26,7 +29,7 @@ impl Lexer {
         Self {
             tokens: Vec::new(),
             line: 1,
-            column: 0
+            column: 0,
         }
     }
 
@@ -44,8 +47,8 @@ impl Lexer {
                     } else {
                         lexer.column += 1;
                     }
-                    continue
-                },
+                    continue;
+                }
                 '(' => lexer.push_token(lexer.char_span(), TokenType::ParenOpen),
                 ')' => lexer.push_token(lexer.char_span(), TokenType::ParenClose),
                 '[' => lexer.push_token(lexer.char_span(), TokenType::SquareBracketOpen),
@@ -60,7 +63,7 @@ impl Lexer {
                         *c == '\n'
                     });
                     lexer.line += 1;
-                },
+                }
                 '/' => lexer.push_token(lexer.char_span(), TokenType::Divide),
                 '*' => lexer.push_token(lexer.char_span(), TokenType::Multiply),
                 '+' => lexer.push_token(lexer.char_span(), TokenType::Plus),
@@ -69,36 +72,36 @@ impl Lexer {
                 '|' if peek_next!(stream, '|') => {
                     lexer.push_token(lexer.line_span(2), TokenType::OrOr);
                     stream.next();
-                },
+                }
                 '|' => lexer.push_token(lexer.char_span(), TokenType::Or),
                 '&' if peek_next!(stream, '&') => {
                     lexer.push_token(lexer.line_span(2), TokenType::AndAnd);
                     stream.next();
-                },
+                }
                 '&' => lexer.push_token(lexer.char_span(), TokenType::And),
                 '!' if peek_next!(stream, '=') => {
                     lexer.push_token(lexer.line_span(2), TokenType::NotEq);
                     stream.next();
-                },
+                }
                 '!' => lexer.push_token(lexer.char_span(), TokenType::Not),
                 '=' if peek_next!(stream, '=') => {
                     lexer.push_token(lexer.line_span(2), TokenType::EqEq);
                     stream.next();
-                },
+                }
                 '=' if peek_next!(stream, '>') => {
                     lexer.push_token(lexer.line_span(2), TokenType::FatArrow);
                     stream.next();
-                },
+                }
                 '=' => lexer.push_token(lexer.char_span(), TokenType::Eq),
                 '>' if peek_next!(stream, '=') => {
                     lexer.push_token(lexer.line_span(2), TokenType::GreaterEq);
                     stream.next();
-                },
+                }
                 '>' => lexer.push_token(lexer.char_span(), TokenType::GreaterThan),
                 '<' if peek_next!(stream, '=') => {
                     lexer.push_token(lexer.line_span(2), TokenType::LessEq);
                     stream.next();
-                },
+                }
                 '<' => lexer.push_token(lexer.char_span(), TokenType::LessThan),
                 ',' => lexer.push_token(lexer.char_span(), TokenType::Comma),
                 '.' => lexer.push_token(lexer.char_span(), TokenType::Period),
@@ -155,7 +158,10 @@ impl Lexer {
                         continue;
                     }
 
-                    lexer.push_token(lexer.line_span(content.len()), TokenType::Identifier(content));
+                    lexer.push_token(
+                        lexer.line_span(content.len()),
+                        TokenType::Identifier(content),
+                    );
                 }
                 '\'' => {
                     let mut content = String::new();
@@ -202,7 +208,11 @@ impl Lexer {
                         stream.next();
                     }
                     let token = if is_float {
-                        TokenType::Float(content.parse().map_err(|_| LexingError::InvalidFloatingNumberFormat)?)
+                        TokenType::Float(
+                            content
+                                .parse()
+                                .map_err(|_| LexingError::InvalidFloatingNumberFormat)?,
+                        )
                     } else {
                         TokenType::Int(content.parse().map_err(|_| LexingError::InvalidIntFormat)?)
                     };
@@ -225,12 +235,12 @@ impl Lexer {
         Span {
             start: LineColumn {
                 line: self.line,
-                column: self.column
+                column: self.column,
             },
             end: LineColumn {
                 line: self.line,
-                column: self.column + 1
-            }
+                column: self.column + 1,
+            },
         }
     }
 
@@ -238,12 +248,12 @@ impl Lexer {
         Span {
             start: LineColumn {
                 line: self.line,
-                column: self.column
+                column: self.column,
             },
             end: LineColumn {
                 line: self.line,
-                column: self.column + length
-            }
+                column: self.column + length,
+            },
         }
     }
 
@@ -251,11 +261,8 @@ impl Lexer {
         self.line = span.end.line;
         self.column = span.end.column;
 
-        let token = Token {
-            span,
-            token_type
-        };
-        
+        let token = Token { span, token_type };
+
         self.tokens.push(token);
     }
 }
@@ -268,118 +275,198 @@ mod tests {
     fn tokenize_delimeters() {
         let input = "(){}[].,:;::";
 
-        assert_token_types(input, vec![
-            TokenType::ParenOpen,
-            TokenType::ParenClose,
-            TokenType::CurlyBracketOpen,
-            TokenType::CurlyBracketClose,
-            TokenType::SquareBracketOpen,
-            TokenType::SquareBracketClose,
-            TokenType::Period,
-            TokenType::Comma,
-            TokenType::Colon,
-            TokenType::SemiConlon,
-            TokenType::ColonColon,
-            TokenType::EOF
-        ]);
+        assert_token_types(
+            input,
+            vec![
+                TokenType::ParenOpen,
+                TokenType::ParenClose,
+                TokenType::CurlyBracketOpen,
+                TokenType::CurlyBracketClose,
+                TokenType::SquareBracketOpen,
+                TokenType::SquareBracketClose,
+                TokenType::Period,
+                TokenType::Comma,
+                TokenType::Colon,
+                TokenType::SemiConlon,
+                TokenType::ColonColon,
+                TokenType::EOF,
+            ],
+        );
     }
 
     #[test]
     fn tokenize_operators() {
         let input = "+-*/%|=&& == != &!>< >= <= =>";
 
-        assert_token_types(input, vec![
-            TokenType::Plus,
-            TokenType::Minus,
-            TokenType::Multiply,
-            TokenType::Divide,
-            TokenType::Mod,
-            TokenType::Or,
-            TokenType::Eq,
-            TokenType::AndAnd,
-            TokenType::EqEq,
-            TokenType::NotEq,
-            TokenType::And,
-            TokenType::Not,
-            TokenType::GreaterThan,
-            TokenType::LessThan,
-            TokenType::GreaterEq,
-            TokenType::LessEq,
-            TokenType::FatArrow,
-            TokenType::EOF
-        ]);
+        assert_token_types(
+            input,
+            vec![
+                TokenType::Plus,
+                TokenType::Minus,
+                TokenType::Multiply,
+                TokenType::Divide,
+                TokenType::Mod,
+                TokenType::Or,
+                TokenType::Eq,
+                TokenType::AndAnd,
+                TokenType::EqEq,
+                TokenType::NotEq,
+                TokenType::And,
+                TokenType::Not,
+                TokenType::GreaterThan,
+                TokenType::LessThan,
+                TokenType::GreaterEq,
+                TokenType::LessEq,
+                TokenType::FatArrow,
+                TokenType::EOF,
+            ],
+        );
     }
 
     #[test]
     fn tokenize_keywords() {
         let input = "fn class mut let _something_else20 return";
 
-        assert_token_types(input, vec![
-            TokenType::Function,
-            TokenType::Class,
-            TokenType::Mut,
-            TokenType::Let,
-            TokenType::Identifier("_something_else20".to_string()),
-            TokenType::Return,
-            TokenType::EOF
-        ]);
+        assert_token_types(
+            input,
+            vec![
+                TokenType::Function,
+                TokenType::Class,
+                TokenType::Mut,
+                TokenType::Let,
+                TokenType::Identifier("_something_else20".to_string()),
+                TokenType::Return,
+                TokenType::EOF,
+            ],
+        );
     }
 
     #[test]
     fn tokenize_string_literals() {
         let input = "let hello = 'Hi! I\\'m Hung'";
 
-        assert_tokens(input, vec![
-            Token { span: Span::from(((1, 0), (1, 3))), token_type: TokenType::Let },
-            Token { span: Span::from(((1, 4), (1, 9))), token_type: TokenType::Identifier("hello".to_string()) },
-            Token { span: Span::from(((1, 10), (1, 11))), token_type: TokenType::Eq },
-            Token { span: Span::from(((1, 12), (1, 24))), token_type: TokenType::String("Hi! I'm Hung".to_string()) },
-            Token { span: Span::from(((1, 24), (1, 25))), token_type: TokenType::EOF }
-        ]);
+        assert_tokens(
+            input,
+            vec![
+                Token {
+                    span: Span::from(((1, 0), (1, 3))),
+                    token_type: TokenType::Let,
+                },
+                Token {
+                    span: Span::from(((1, 4), (1, 9))),
+                    token_type: TokenType::Identifier("hello".to_string()),
+                },
+                Token {
+                    span: Span::from(((1, 10), (1, 11))),
+                    token_type: TokenType::Eq,
+                },
+                Token {
+                    span: Span::from(((1, 12), (1, 24))),
+                    token_type: TokenType::String("Hi! I'm Hung".to_string()),
+                },
+                Token {
+                    span: Span::from(((1, 24), (1, 25))),
+                    token_type: TokenType::EOF,
+                },
+            ],
+        );
     }
 
     #[test]
     fn tokenize_boolean() {
         let input = "let isAwesome = true";
 
-        assert_tokens(input, vec![
-            Token { span: Span::from(((1, 0), (1, 3))), token_type: TokenType::Let },
-            Token { span: Span::from(((1, 4), (1, 13))), token_type: TokenType::Identifier("isAwesome".to_string()) },
-            Token { span: Span::from(((1, 14), (1, 15))), token_type: TokenType::Eq },
-            Token { span: Span::from(((1, 16), (1, 20))), token_type: TokenType::Boolean(true) },
-            Token { span: Span::from(((1, 20), (1, 21))), token_type: TokenType::EOF }
-        ]);
+        assert_tokens(
+            input,
+            vec![
+                Token {
+                    span: Span::from(((1, 0), (1, 3))),
+                    token_type: TokenType::Let,
+                },
+                Token {
+                    span: Span::from(((1, 4), (1, 13))),
+                    token_type: TokenType::Identifier("isAwesome".to_string()),
+                },
+                Token {
+                    span: Span::from(((1, 14), (1, 15))),
+                    token_type: TokenType::Eq,
+                },
+                Token {
+                    span: Span::from(((1, 16), (1, 20))),
+                    token_type: TokenType::Boolean(true),
+                },
+                Token {
+                    span: Span::from(((1, 20), (1, 21))),
+                    token_type: TokenType::EOF,
+                },
+            ],
+        );
     }
 
     #[test]
     fn tokenize_float_literals() {
         let input = "let age = 10.5235";
 
-        assert_tokens(input, vec![
-            Token { span: Span::from(((1, 0), (1, 3))), token_type: TokenType::Let },
-            Token { span: Span::from(((1, 4), (1, 7))), token_type: TokenType::Identifier("age".to_string()) },
-            Token { span: Span::from(((1, 8), (1, 9))), token_type: TokenType::Eq },
-            Token { span: Span::from(((1, 10), (1, 17))), token_type: TokenType::Float(10.5235) },
-            Token { span: Span::from(((1, 17), (1, 18))), token_type: TokenType::EOF }
-        ]);
+        assert_tokens(
+            input,
+            vec![
+                Token {
+                    span: Span::from(((1, 0), (1, 3))),
+                    token_type: TokenType::Let,
+                },
+                Token {
+                    span: Span::from(((1, 4), (1, 7))),
+                    token_type: TokenType::Identifier("age".to_string()),
+                },
+                Token {
+                    span: Span::from(((1, 8), (1, 9))),
+                    token_type: TokenType::Eq,
+                },
+                Token {
+                    span: Span::from(((1, 10), (1, 17))),
+                    token_type: TokenType::Float(10.5235),
+                },
+                Token {
+                    span: Span::from(((1, 17), (1, 18))),
+                    token_type: TokenType::EOF,
+                },
+            ],
+        );
     }
 
     #[test]
     fn tokenize_int_literals() {
         let input = "let age = 22";
 
-        assert_tokens(input, vec![
-            Token { span: Span::from(((1, 0), (1, 3))), token_type: TokenType::Let },
-            Token { span: Span::from(((1, 4), (1, 7))), token_type: TokenType::Identifier("age".to_string()) },
-            Token { span: Span::from(((1, 8), (1, 9))), token_type: TokenType::Eq },
-            Token { span: Span::from(((1, 10), (1, 12))), token_type: TokenType::Int(22) },
-            Token { span: Span::from(((1, 12), (1, 13))), token_type: TokenType::EOF }
-        ]);
+        assert_tokens(
+            input,
+            vec![
+                Token {
+                    span: Span::from(((1, 0), (1, 3))),
+                    token_type: TokenType::Let,
+                },
+                Token {
+                    span: Span::from(((1, 4), (1, 7))),
+                    token_type: TokenType::Identifier("age".to_string()),
+                },
+                Token {
+                    span: Span::from(((1, 8), (1, 9))),
+                    token_type: TokenType::Eq,
+                },
+                Token {
+                    span: Span::from(((1, 10), (1, 12))),
+                    token_type: TokenType::Int(22),
+                },
+                Token {
+                    span: Span::from(((1, 12), (1, 13))),
+                    token_type: TokenType::EOF,
+                },
+            ],
+        );
     }
 
     fn assert_tokens(input: &str, expect: Vec<Token>) {
-        let tokens = Lexer::tokenize(input)
-            .expect("Lexer tokenization error");
+        let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
 
         assert_eq!(tokens, expect);
     }

@@ -3,7 +3,7 @@ use crate::span::Span;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub span: Span,
-    pub token_type: TokenType
+    pub token_type: TokenType,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -56,5 +56,5 @@ pub enum TokenType {
     String(String),
     Boolean(bool),
 
-    EOF
+    EOF,
 }

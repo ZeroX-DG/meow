@@ -1,10 +1,13 @@
-use crate::{lexer::{Token, TokenType}, stream::ParsingStream};
+use crate::{
+    lexer::{Token, TokenType},
+    stream::ParsingStream,
+};
 
 use super::{ast::Identifier, Parser, ParsingError};
 
 #[derive(Debug, PartialEq)]
 pub struct Path {
-    pub segments: Vec<PathSegment>
+    pub segments: Vec<PathSegment>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -16,7 +19,7 @@ pub struct PathSegment {
 /// Path = <PathSegment> + (:: + <PathSegment>)*
 pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingError> {
     let mut path = Path {
-        segments: Vec::new()
+        segments: Vec::new(),
     };
 
     loop {
@@ -24,8 +27,10 @@ pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingErro
         path.segments.push(segment);
 
         match stream.peek().token_type {
-            TokenType::ColonColon => { stream.next(); }
-            _ => break
+            TokenType::ColonColon => {
+                stream.next();
+            }
+            _ => break,
         }
     }
 
@@ -36,7 +41,7 @@ pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingErro
 /// PathSegment = <Identifier>
 pub fn parse_path_segment(stream: &mut ParsingStream<Token>) -> Result<PathSegment, ParsingError> {
     let ident = Parser::parse_identifier(stream)?;
-    Ok(PathSegment{ ident })
+    Ok(PathSegment { ident })
 }
 
 #[cfg(test)]
@@ -49,12 +54,26 @@ mod tests {
     fn test_parse_path() {
         // std::string
         assert_parsing_result(
-            vec![TokenType::Identifier(String::from("std")), TokenType::ColonColon, TokenType::Identifier(String::from("string"))],
+            vec![
+                TokenType::Identifier(String::from("std")),
+                TokenType::ColonColon,
+                TokenType::Identifier(String::from("string")),
+            ],
             parse_path,
-            Ok(Path { segments: vec![
-                PathSegment { ident: Identifier { name: String::from("std") } },
-                PathSegment { ident: Identifier { name: String::from("string") } },
-            ]})
+            Ok(Path {
+                segments: vec![
+                    PathSegment {
+                        ident: Identifier {
+                            name: String::from("std"),
+                        },
+                    },
+                    PathSegment {
+                        ident: Identifier {
+                            name: String::from("string"),
+                        },
+                    },
+                ],
+            }),
         );
     }
 }

@@ -1,6 +1,6 @@
 pub mod ast;
-mod path;
 mod expression;
+mod path;
 mod statement;
 
 use std::fmt::Debug;
@@ -30,7 +30,7 @@ macro_rules! expect_token {
     ($x:expr, $y:pat) => {
         match &$x.token_type {
             $y => {}
-            _ => return Err(ParsingError::UnexpectedToken($x.clone()))
+            _ => return Err(ParsingError::UnexpectedToken($x.clone())),
         }
     };
 }
@@ -38,15 +38,13 @@ macro_rules! expect_token {
 pub(crate) use expect_token;
 
 pub struct Parser {
-    pub program: Program
+    pub program: Program,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Self {
-            program: Program {
-                items: Vec::new()
-            }
+            program: Program { items: Vec::new() },
         }
     }
 
@@ -54,11 +52,14 @@ impl Parser {
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
         let mut tokens_iter = tokens.into_iter();
-        let mut stream = ParsingStream::new(&mut tokens_iter, Token {
-            token_type: TokenType::EOF,
-            span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
-        });
-        
+        let mut stream = ParsingStream::new(
+            &mut tokens_iter,
+            Token {
+                token_type: TokenType::EOF,
+                span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+            },
+        );
+
         loop {
             let token = stream.peek();
 
@@ -67,12 +68,12 @@ impl Parser {
             }
 
             let item = Item {
-                kind: ItemKind::Statement(statement::parse_statement(&mut stream)?)
+                kind: ItemKind::Statement(statement::parse_statement(&mut stream)?),
             };
             parser.program.items.push(item);
         }
 
-        return Ok(parser.program)
+        return Ok(parser.program);
     }
 
     /// Parse an identiifier with syntax:
@@ -80,8 +81,10 @@ impl Parser {
     fn parse_identifier(stream: &mut ParsingStream<Token>) -> Result<Identifier, ParsingError> {
         let token = stream.next();
         match token.token_type {
-            TokenType::Identifier(ident) => Ok(Identifier { name: ident.clone() }),
-            _ => Err(ParsingError::UnexpectedToken(token.clone()))
+            TokenType::Identifier(ident) => Ok(Identifier {
+                name: ident.clone(),
+            }),
+            _ => Err(ParsingError::UnexpectedToken(token.clone())),
         }
     }
 }
@@ -90,34 +93,40 @@ impl Parser {
 mod tests {
     use super::*;
 
-    pub fn assert_parsing_result<T, F>(token_types: Vec<TokenType>, parsing_fn: F, expected: Result<T, ParsingError>)
-        where
-            F: Fn(&mut ParsingStream<Token>) -> Result<T, ParsingError>,
-            T: PartialEq + Debug
+    pub fn assert_parsing_result<T, F>(
+        token_types: Vec<TokenType>,
+        parsing_fn: F,
+        expected: Result<T, ParsingError>,
+    ) where
+        F: Fn(&mut ParsingStream<Token>) -> Result<T, ParsingError>,
+        T: PartialEq + Debug,
     {
-        let tokens = token_types.into_iter()
-            .map(|token_type| Token { token_type, span: Span::from(((0, 0), (0, 0))) })
+        let tokens = token_types
+            .into_iter()
+            .map(|token_type| Token {
+                token_type,
+                span: Span::from(((0, 0), (0, 0))),
+            })
             .collect::<Vec<Token>>();
         let mut iter = tokens.into_iter();
-        let mut stream = ParsingStream::new(&mut iter, Token {
-            token_type: TokenType::EOF,
-            span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
-        });
+        let mut stream = ParsingStream::new(
+            &mut iter,
+            Token {
+                token_type: TokenType::EOF,
+                span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+            },
+        );
         assert_eq!(parsing_fn(&mut stream), expected)
     }
 
     #[test]
     fn test_parse_empty_program() {
-        let tokens = vec![
-            Token {
-                token_type: TokenType::EOF,
-                span: Span::from(((0, 0), (0, 0))) // random span cus we don't care
-            }
-        ];
+        let tokens = vec![Token {
+            token_type: TokenType::EOF,
+            span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+        }];
         let ast = Parser::parse(tokens).expect("Failed to parse tokens");
-        let expected = Program {
-            items: Vec::new()
-        };
+        let expected = Program { items: Vec::new() };
         assert_eq!(ast, expected)
     }
 }

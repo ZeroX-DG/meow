@@ -1,4 +1,7 @@
-use crate::parser::ast::{Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
+use crate::parser::ast::{
+    Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind,
+    VariableDeclaration, VariableDeclarationKind,
+};
 
 #[derive(Debug)]
 pub struct CompileError(String);
@@ -11,7 +14,7 @@ impl Compiler {
 
         for item in program.items {
             let compiled = match item.kind {
-                ItemKind::Statement(statement) => Compiler::compile_statement(statement)?
+                ItemKind::Statement(statement) => Compiler::compile_statement(statement)?,
             };
             result.push_str(&compiled);
         }
@@ -27,11 +30,25 @@ impl Compiler {
         Ok(format!("{};\n", result))
     }
 
-    fn compile_variable_declaration(declaration: VariableDeclaration) -> Result<String, CompileError> {
-        let declaration_keyword = if declaration.is_mutable { "let" } else { "const" };
+    fn compile_variable_declaration(
+        declaration: VariableDeclaration,
+    ) -> Result<String, CompileError> {
+        let declaration_keyword = if declaration.is_mutable {
+            "let"
+        } else {
+            "const"
+        };
         match declaration.kind {
-            VariableDeclarationKind::Declaration => Ok(format!("{} {}", declaration_keyword, declaration.identifier.name)),
-            VariableDeclarationKind::Init(expression) => Ok(format!("{} {} = {}", declaration_keyword, declaration.identifier.name, Compiler::compile_expression(expression)?))
+            VariableDeclarationKind::Declaration => Ok(format!(
+                "{} {}",
+                declaration_keyword, declaration.identifier.name
+            )),
+            VariableDeclarationKind::Init(expression) => Ok(format!(
+                "{} {} = {}",
+                declaration_keyword,
+                declaration.identifier.name,
+                Compiler::compile_expression(expression)?
+            )),
         }
     }
 
@@ -41,8 +58,8 @@ impl Compiler {
                 LiteralKind::String(value) => Ok(format!("'{}'", value)),
                 LiteralKind::Boolean(value) => Ok(value.to_string()),
                 LiteralKind::Float(value) => Ok(value.to_string()),
-                LiteralKind::Int(value) => Ok(value.to_string())
-            }
+                LiteralKind::Int(value) => Ok(value.to_string()),
+            },
         }
     }
 }
