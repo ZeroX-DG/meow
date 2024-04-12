@@ -1,4 +1,4 @@
-use crate::parser::ast::{Block, Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
+use crate::parser::ast::{Expression, ExpressionKind, ItemKind, LiteralKind, Program, Statement, StatementKind, VariableDeclaration, VariableDeclarationKind};
 
 #[derive(Debug)]
 pub struct CompileError(String);
@@ -28,7 +28,7 @@ impl Compiler {
     }
 
     fn compile_variable_declaration(declaration: VariableDeclaration) -> Result<String, CompileError> {
-        let declaration_keyword = if declaration.identifier.mutable { "let" } else { "const" };
+        let declaration_keyword = if declaration.is_mutable { "let" } else { "const" };
         match declaration.kind {
             VariableDeclarationKind::Declaration => Ok(format!("{} {}", declaration_keyword, declaration.identifier.name)),
             VariableDeclarationKind::Init(expression) => Ok(format!("{} {} = {}", declaration_keyword, declaration.identifier.name, Compiler::compile_expression(expression)?))
@@ -43,28 +43,6 @@ impl Compiler {
                 LiteralKind::Float(value) => Ok(value.to_string()),
                 LiteralKind::Int(value) => Ok(value.to_string())
             }
-            ExpressionKind::Function(function) => {
-                let args: Vec<String> = function.args.iter().map(|arg| arg.identifier.name.clone()).collect();
-                Ok(format!("({}) => {}", args.join(", "), Compiler::compile_block(function.body)?))
-            }
-            ExpressionKind::PropertyAccess(path) => {
-                Ok(path.iter().map(|ident| ident.name.to_owned()).collect::<Vec<String>>().join("."))
-            }
-            ExpressionKind::Call(property_access, args) => {
-                let mut compiled_args = Vec::new();
-                for arg in args {
-                    compiled_args.push(Compiler::compile_expression(arg)?);
-                }
-                Ok(format!("{}({})", Compiler::compile_expression(*property_access)?, compiled_args.join(", ")))
-            }
         }
-    }
-
-    fn compile_block(block: Block) -> Result<String, CompileError> {
-        let mut result = String::new();
-        for statement in block.statements {
-            result.push_str(&format!("  {}", Compiler::compile_statement(statement)?));
-        }
-        Ok(format!("{{\n{}}}", result))
     }
 }

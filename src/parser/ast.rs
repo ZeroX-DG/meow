@@ -1,3 +1,6 @@
+pub use super::path::{Path, PathSegment};
+pub use super::expression::{Expression, ExpressionKind, Literal, LiteralKind};
+
 #[derive(Debug, PartialEq)]
 pub struct Program {
     pub items: Vec<Item>
@@ -39,19 +42,6 @@ pub enum VariableDeclarationKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Expression {
-    pub kind: ExpressionKind
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ExpressionKind {
-    Literal(Literal),
-    Function(Function),
-    PropertyAccess(Vec<Identifier>),
-    Call(Box<Expression>, Vec<Expression>)
-}
-
-#[derive(Debug, PartialEq)]
 pub struct Function {
     pub args: Vec<FunctionArg>,
     pub body: Block
@@ -66,19 +56,6 @@ pub struct FunctionArg {
 #[derive(Debug, PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Literal {
-    pub kind: LiteralKind
-}
-
-#[derive(Debug, PartialEq)]
-pub enum LiteralKind {
-    Int(i64),
-    Float(f64),
-    String(String),
-    Boolean(bool),
 }
 
 #[derive(Debug, PartialEq)]
@@ -97,12 +74,3 @@ pub enum TypeKind {
     TypePath(Path)
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Path {
-    pub segments: Vec<PathSegment>
-}
-
-#[derive(Debug, PartialEq)]
-pub struct PathSegment {
-    pub ident: Identifier,
-}
