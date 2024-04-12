@@ -40,6 +40,7 @@ pub enum Token {
     SquareBracketClose,
     CurlyBracketOpen,
     CurlyBracketClose,
+    ColonColon,
 
     // Literals
     Int(i64),

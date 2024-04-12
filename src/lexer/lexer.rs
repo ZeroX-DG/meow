@@ -87,6 +87,10 @@ impl Lexer {
                 '<' => lexer.push_token(Token::LessThan),
                 ',' => lexer.push_token(Token::Comma),
                 '.' => lexer.push_token(Token::Period),
+                ':' if peek_next!(stream, ':') => {
+                    lexer.push_token(Token::ColonColon);
+                    stream.next();
+                }
                 ':' => lexer.push_token(Token::Colon),
                 ';' => lexer.push_token(Token::SemiConlon),
                 'a'..='z' | 'A'..='Z' | '_' => {
@@ -213,7 +217,7 @@ mod tests {
 
     #[test]
     fn tokenize_delimeters() {
-        let input = "(){}[].,:;";
+        let input = "(){}[].,:;::";
         let tokens = Lexer::tokenize(input).expect("Lexer tokenization error");
         assert_eq!(tokens, vec![
             Token::ParenOpen,
@@ -226,6 +230,7 @@ mod tests {
             Token::Comma,
             Token::Colon,
             Token::SemiConlon,
+            Token::ColonColon,
             Token::EOF
         ]);
     }
