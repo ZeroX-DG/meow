@@ -20,7 +20,7 @@ impl Debug for ParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParsingError::UnexpectedToken(token) => {
-                write!(f, "Unexpected token encountered: {:?}", token)
+                write!(f, "Unexpected token encountered: {:#?}", token)
             }
         }
     }
@@ -51,12 +51,18 @@ impl Parser {
     /// Parse at the top level of the program
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
+        let last_span = tokens.last()
+            .cloned()
+            .map(|token| token.span)
+            .unwrap_or(Span::from(((1, 0), (1, 1))));
+
         let mut tokens_iter = tokens.into_iter();
+
         let mut stream = ParsingStream::new(
             &mut tokens_iter,
             Token {
                 token_type: TokenType::EOF,
-                span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+                span: last_span,
             },
         );
 
@@ -108,12 +114,12 @@ mod tests {
                 span: Span::from(((0, 0), (0, 0))),
             })
             .collect::<Vec<Token>>();
-        let mut iter = tokens.into_iter();
+        let mut iter = tokens.clone().into_iter();
         let mut stream = ParsingStream::new(
             &mut iter,
             Token {
                 token_type: TokenType::EOF,
-                span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+                span: Span::from(((0, 0), (0, 0))),
             },
         );
         assert_eq!(parsing_fn(&mut stream), expected)

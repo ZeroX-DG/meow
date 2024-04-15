@@ -78,7 +78,6 @@ fn parse_function_expression(stream: &mut ParsingStream<Token>) -> Result<Expres
     let mut args = Vec::new();
 
     loop {
-        args.push(parse_argument(stream)?);
         match stream.peek().token_type {
             TokenType::Comma => {
                 stream.next();
@@ -86,6 +85,9 @@ fn parse_function_expression(stream: &mut ParsingStream<Token>) -> Result<Expres
             TokenType::ParenClose => {
                 stream.next();
                 break;
+            }
+            TokenType::Identifier(_) => {
+                args.push(parse_argument(stream)?);
             }
             _ => return Err(ParsingError::UnexpectedToken(stream.next()))
         }
@@ -118,11 +120,11 @@ fn parse_block(stream: &mut ParsingStream<Token>) -> Result<Block, ParsingError>
     let mut statements = Vec::new();
 
     loop {
-        statements.push(parse_statement(stream)?);
         if stream.peek().token_type == TokenType::CurlyBracketClose {
             stream.next();
             break;
         }
+        statements.push(parse_statement(stream)?);
     }
 
     Ok(Block { statements })
@@ -346,6 +348,56 @@ mod tests {
                         })}
                     ]
                 }
+            })})
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_body_function() {
+        assert_parsing_result(
+            vec![
+                TokenType::Function,
+                TokenType::ParenOpen,
+                TokenType::Identifier("hello".to_string()),
+                TokenType::Comma,
+                TokenType::Identifier("world".to_string()),
+                TokenType::Colon,
+                TokenType::Identifier("string".to_string()),
+                TokenType::ParenClose,
+                TokenType::CurlyBracketOpen,
+                TokenType::CurlyBracketClose,
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::Function(Function {
+                args: vec![
+                    FunctionArg {
+                        identifier: Identifier { name: "hello".to_string() },
+                        arg_type: Type { kind: TypeKind::Infer }
+                    },
+                    FunctionArg {
+                        identifier: Identifier { name: "world".to_string() },
+                        arg_type: Type { kind: TypeKind::TypePath(Path { segments: vec![PathSegment { ident: Identifier { name: "string".to_string() } }] }) }
+                    },
+                ],
+                body: Block { statements: vec![] }
+            })})
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_arg_function() {
+        assert_parsing_result(
+            vec![
+                TokenType::Function,
+                TokenType::ParenOpen,
+                TokenType::ParenClose,
+                TokenType::CurlyBracketOpen,
+                TokenType::CurlyBracketClose,
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::Function(Function {
+                args: vec![],
+                body: Block { statements: vec![] }
             })})
         );
     }
