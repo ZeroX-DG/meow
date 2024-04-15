@@ -20,23 +20,6 @@ pub enum ItemKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Function {
-    pub args: Vec<FunctionArg>,
-    pub body: Block,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct FunctionArg {
-    pub identifier: Identifier,
-    pub arg_type: Type,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Block {
-    pub statements: Vec<Statement>,
-}
-
-#[derive(Debug, PartialEq)]
 pub struct Identifier {
     pub name: String,
 }

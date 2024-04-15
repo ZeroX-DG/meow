@@ -1,10 +1,8 @@
 use crate::{
-    lexer::{Token, TokenType},
-    span::Span,
-    stream::ParsingStream,
+    lexer::{Token, TokenType}, parser::statement::parse_statement, span::Span, stream::ParsingStream
 };
 
-use super::ParsingError;
+use super::{ast::{Identifier, Type}, expect_token, statement::{parse_type, Statement}, ParsingError};
 
 #[derive(Debug, PartialEq)]
 pub struct Expression {
@@ -15,6 +13,7 @@ pub struct Expression {
 pub enum ExpressionKind {
     Literal(Literal),
     BinaryOp(BinaryOp),
+    Function(Function)
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,10 +45,87 @@ pub enum LiteralKind {
     Boolean(bool),
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Function {
+    pub args: Vec<FunctionArg>,
+    pub body: Block,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionArg {
+    pub identifier: Identifier,
+    pub arg_type: Type,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Block {
+    pub statements: Vec<Statement>,
+}
+
 /// Parse an expression with syntax:
-/// Expression = <LiteralExpression> | <BinaryOperationExpression>
+/// Expression = <LiteralExpression> | <BinaryOperationExpression> | <FunctionExpression>
 pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
-    parse_expression_binding_power(stream, 0)
+    match stream.peek().token_type {
+        TokenType::Function => parse_function_expression(stream),
+        _ => parse_expression_binding_power(stream, 0)
+    }
+}
+
+fn parse_function_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    expect_token!(stream.next(), TokenType::Function);
+    expect_token!(stream.next(), TokenType::ParenOpen);
+
+    let mut args = Vec::new();
+
+    loop {
+        args.push(parse_argument(stream)?);
+        match stream.peek().token_type {
+            TokenType::Comma => {
+                stream.next();
+            }
+            TokenType::ParenClose => {
+                stream.next();
+                break;
+            }
+            _ => return Err(ParsingError::UnexpectedToken(stream.next()))
+        }
+    }
+
+    let body = parse_block(stream)?;
+
+    Ok(Expression { kind: ExpressionKind::Function(Function { args, body }) })
+}
+
+/// Parse an argument with syntax:
+/// Arg = <Identifer> + : + <Type>
+fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, ParsingError> {
+    let token = stream.next();
+    let identifier = match token.token_type {
+        TokenType::Identifier(name) => Identifier { name },
+        _ => return Err(ParsingError::UnexpectedToken(token))
+    };
+
+    let arg_type = parse_type(stream)?;
+
+    Ok(FunctionArg { identifier, arg_type })
+}
+
+/// Parse a block with syntax:
+/// Block = { + <Statements> + }
+fn parse_block(stream: &mut ParsingStream<Token>) -> Result<Block, ParsingError> {
+    expect_token!(stream.next(), TokenType::CurlyBracketOpen);
+
+    let mut statements = Vec::new();
+
+    loop {
+        statements.push(parse_statement(stream)?);
+        if stream.peek().token_type == TokenType::CurlyBracketClose {
+            stream.next();
+            break;
+        }
+    }
+
+    Ok(Block { statements })
 }
 
 /// Parse an expression with a specified min binding power for Pratt parsing.
@@ -65,12 +141,11 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
     loop {
         let token = stream.peek();
         let op = match token.token_type {
-            TokenType::EOF => break,
             TokenType::Plus => Operator::Add,
             TokenType::Minus => Operator::Subtract,
             TokenType::Multiply => Operator::Multiply,
             TokenType::Divide => Operator::Divide,
-            _ => return Err(ParsingError::UnexpectedToken(token.clone()))
+            _ => break
         };
 
         let (left_binding_power, right_binding_power) = infix_binding_power(&op);
@@ -133,7 +208,7 @@ fn parse_literal_expression(
 
 #[cfg(test)]
 mod tests {
-    use crate::{parser::tests::assert_parsing_result, span::Span};
+    use crate::{parser::{ast::TypeKind, path::{Path, PathSegment}, statement::{StatementKind, VariableDeclaration, VariableDeclarationKind}, tests::assert_parsing_result}, span::Span};
 
     use super::*;
 
@@ -222,6 +297,55 @@ mod tests {
                     left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(2), span: span.clone() }) }),
                     right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
                 })})
+            })})
+        );
+    }
+
+    #[test]
+    fn test_parse_simple_function() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::Function,
+                TokenType::ParenOpen,
+                TokenType::Identifier("hello".to_string()),
+                TokenType::Comma,
+                TokenType::Identifier("world".to_string()),
+                TokenType::Colon,
+                TokenType::Identifier("string".to_string()),
+                TokenType::ParenClose,
+                TokenType::CurlyBracketOpen,
+                TokenType::Let,
+                TokenType::Identifier("a".to_string()),
+                TokenType::Eq,
+                TokenType::Int(10),
+                TokenType::SemiConlon,
+                TokenType::CurlyBracketClose,
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::Function(Function {
+                args: vec![
+                    FunctionArg {
+                        identifier: Identifier { name: "hello".to_string() },
+                        arg_type: Type { kind: TypeKind::Infer }
+                    },
+                    FunctionArg {
+                        identifier: Identifier { name: "world".to_string() },
+                        arg_type: Type { kind: TypeKind::TypePath(Path { segments: vec![PathSegment { ident: Identifier { name: "string".to_string() } }] }) }
+                    },
+                ],
+                body: Block {
+                    statements: vec![
+                        Statement { kind: StatementKind::Let(VariableDeclaration {
+                            identifier: Identifier { name: "a".to_string() },
+                            variable_type: Type { kind: TypeKind::Infer },
+                            kind: VariableDeclarationKind::Init(Expression {
+                                kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(10), span })
+                            }),
+                            is_mutable: false
+                        })}
+                    ]
+                }
             })})
         );
     }

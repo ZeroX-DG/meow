@@ -67,7 +67,7 @@ fn parse_let_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, P
 }
 
 /// Parse a variable declaration with syntax:
-/// VariableDeclaration = <Let> + <Identifier> + (<Mut>)? + (: <Type>)? + = + <Expression> + ;
+/// VariableDeclaration = <Let> + (<Mut>)? + <Identifier> + (: <Type>)? + = + <Expression> + ;
 fn parse_variable_declaration(
     stream: &mut ParsingStream<Token>,
 ) -> Result<VariableDeclaration, ParsingError> {
@@ -91,20 +91,7 @@ fn parse_variable_declaration(
         }
     }
 
-    let token = stream.peek();
-    let variable_type = match token.token_type {
-        TokenType::Colon => {
-            stream.next(); // Consume Colon
-            let path = path::parse_path(stream)?;
-            Type {
-                kind: TypeKind::TypePath(path),
-            }
-        }
-        TokenType::Eq | TokenType::SemiConlon => Type {
-            kind: TypeKind::Infer,
-        },
-        _ => return Err(ParsingError::UnexpectedToken(token.clone())),
-    };
+    let variable_type = parse_type(stream)?;
 
     let variable_declaration_kind = match stream.peek().token_type {
         TokenType::Eq => {
@@ -124,6 +111,26 @@ fn parse_variable_declaration(
     };
 
     Ok(variable_declaration)
+}
+
+/// Parsing a type
+pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, ParsingError> {
+    let token = stream.peek();
+    let variable_type = match token.token_type {
+        TokenType::Colon => {
+            stream.next(); // Consume Colon
+            let path = path::parse_path(stream)?;
+            Type {
+                kind: TypeKind::TypePath(path),
+            }
+        }
+        TokenType::Eq | TokenType::SemiConlon | TokenType::Comma => Type {
+            kind: TypeKind::Infer,
+        },
+        _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+    };
+
+    Ok(variable_type)
 }
 
 #[cfg(test)]
