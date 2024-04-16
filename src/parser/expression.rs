@@ -13,8 +13,15 @@ pub struct Expression {
 pub enum ExpressionKind {
     Literal(Literal),
     BinaryOp(BinaryOp),
+    UnaryOp(UnaryOp),
     Function(Function),
     Path(Path)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UnaryOp {
+    pub op: Operator,
+    pub expression: Box<Expression>
 }
 
 #[derive(Debug, PartialEq)]
@@ -143,17 +150,22 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
         TokenType::Identifier(_) => {
             parse_path_expression(stream)?
         }
+        TokenType::Plus | TokenType::Minus => {
+            stream.next();
+            let op = token_type_to_operator(token.token_type).unwrap();
+            let ((), right_binding_power) = prefix_binding_power(&op);
+            let right = parse_expression_binding_power(stream, right_binding_power)?;
+            Expression {
+                kind: ExpressionKind::UnaryOp(UnaryOp { op, expression: Box::new(right) })
+            }
+        }
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
     };
 
     loop {
         let token = stream.peek();
-        let op = match token.token_type {
-            TokenType::Plus => Operator::Add,
-            TokenType::Minus => Operator::Subtract,
-            TokenType::Multiply => Operator::Multiply,
-            TokenType::Divide => Operator::Divide,
-            _ => break
+        let Some(op) = token_type_to_operator(token.token_type) else {
+            break;
         };
 
         let (left_binding_power, right_binding_power) = infix_binding_power(&op);
@@ -177,11 +189,29 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
     Ok(left)
 }
 
+fn token_type_to_operator(token_type: TokenType) -> Option<Operator> {
+    match token_type {
+        TokenType::Plus => Some(Operator::Add),
+        TokenType::Minus => Some(Operator::Subtract),
+        TokenType::Multiply => Some(Operator::Multiply),
+        TokenType::Divide => Some(Operator::Divide),
+        _ => None
+    }
+}
+
 /// Binding power for infix ooperators like add, subtract, etc.
 fn infix_binding_power(op: &Operator) -> (u8, u8) {
     match op {
         Operator::Add | Operator::Subtract => (1, 2),
         Operator::Multiply | Operator::Divide => (3, 4),
+    }
+}
+
+/// Binding power for infix ooperators like add, subtract
+fn prefix_binding_power(op: &Operator) -> ((), u8) {
+    match op {
+        Operator::Add | Operator::Subtract => ((), 5),
+        _ => unreachable!("Invalid operator")
     }
 }
 
@@ -439,6 +469,28 @@ mod tests {
                         PathSegment { ident: Identifier { name: "b".to_string() } },
                     ]})}),
                     right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
+                })})
+            })})
+        );
+    }
+
+    #[test]
+    fn test_unary_op() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::Int(5),
+                TokenType::Plus,
+                TokenType::Minus,
+                TokenType::Int(5),
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                op: Operator::Add,
+                left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) }),
+                right: Box::new(Expression { kind: ExpressionKind::UnaryOp(UnaryOp {
+                    op: Operator::Subtract,
+                    expression: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) })
                 })})
             })})
         );
