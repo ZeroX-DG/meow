@@ -150,6 +150,12 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
         TokenType::Identifier(_) => {
             parse_path_expression(stream)?
         }
+        TokenType::ParenOpen => {
+            stream.next();
+            let expression = parse_expression_binding_power(stream, 0)?;
+            expect_token!(stream.next(), TokenType::ParenClose);
+            expression
+        }
         TokenType::Plus | TokenType::Minus => {
             stream.next();
             let op = token_type_to_operator(token.token_type).unwrap();
@@ -493,6 +499,50 @@ mod tests {
                     expression: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) })
                 })})
             })})
+        );
+    }
+
+    #[test]
+    fn test_parenthesised_expression() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::ParenOpen,
+                TokenType::Int(5),
+                TokenType::Minus,
+                TokenType::Int(1),
+                TokenType::ParenClose,
+                TokenType::Multiply,
+                TokenType::Int(4),
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                op: Operator::Multiply,
+                left: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Subtract,
+                    left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) }),
+                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(1), span: span.clone() }) }),
+                })}),
+                right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(4), span: span.clone() }) })
+            })})
+        );
+    }
+
+    #[test]
+    fn test_multiple_parenthesised_expression() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::ParenOpen,
+                TokenType::ParenOpen,
+                TokenType::ParenOpen,
+                TokenType::Int(5),
+                TokenType::ParenClose,
+                TokenType::ParenClose,
+                TokenType::ParenClose,
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) })
         );
     }
 }
