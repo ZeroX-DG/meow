@@ -1,0 +1,33 @@
+// Just for planning. No serious business yet
+
+#[external('some-library')]
+let SomeClass = class {
+    #[constructor]
+    let new = fn() -> Self;
+
+    let method = fn() -> number;
+
+    #[map_to('methodA')]
+    let method_a = fn() -> string;
+}
+
+
+#[external('react-dom')]
+let reactDOM = module {
+
+    #[external('react-dom/Element')]
+    let ReactElement = class {};
+
+    #[native('Element')]
+    let Element = class {};
+
+    let render = fn(ReactElement, Element, Option[fn() -> void])
+}
+
+#[native('document')]
+let document: Document;
+
+#[native('window.console.log')]
+let log: fn(string) -> void;
+
+log('sdafasdf')
