@@ -151,19 +151,10 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
             parse_path_expression(stream)?
         }
         TokenType::ParenOpen => {
-            stream.next();
-            let expression = parse_expression_binding_power(stream, 0)?;
-            expect_token!(stream.next(), TokenType::ParenClose);
-            expression
+            parse_parenthesised_expression(stream)?
         }
         TokenType::Plus | TokenType::Minus => {
-            stream.next();
-            let op = token_type_to_operator(token.token_type).unwrap();
-            let ((), right_binding_power) = prefix_binding_power(&op);
-            let right = parse_expression_binding_power(stream, right_binding_power)?;
-            Expression {
-                kind: ExpressionKind::UnaryOp(UnaryOp { op, expression: Box::new(right) })
-            }
+            parse_unary_operation(stream)?
         }
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
     };
@@ -226,6 +217,27 @@ fn prefix_binding_power(op: &Operator) -> ((), u8) {
 fn parse_path_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     let path = parse_path(stream)?;
     Ok(Expression { kind: ExpressionKind::Path(path) })
+}
+
+/// Parse a parenthesised expression
+/// ParenthesisedExpression = ( + <Expression> + )
+fn parse_parenthesised_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    expect_token!(stream.next(), TokenType::ParenOpen);
+    let expression = parse_expression_binding_power(stream, 0)?;
+    expect_token!(stream.next(), TokenType::ParenClose);
+    Ok(expression)
+}
+
+/// Parse a unary operation
+/// UnaryOperation = <Plus> | <Minus> + <Expression>
+fn parse_unary_operation(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    let token = stream.next();
+    let op = token_type_to_operator(token.token_type).unwrap();
+    let ((), right_binding_power) = prefix_binding_power(&op);
+    let right = parse_expression_binding_power(stream, right_binding_power)?;
+    Ok(Expression {
+        kind: ExpressionKind::UnaryOp(UnaryOp { op, expression: Box::new(right) })
+    })
 }
 
 /// Parse a literal expression with syntax:
