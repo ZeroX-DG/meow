@@ -2,7 +2,7 @@ use crate::{
     lexer::{Token, TokenType}, parser::statement::parse_statement, span::Span, stream::ParsingStream
 };
 
-use super::{ast::{Identifier, Type}, expect_token, statement::{parse_type, Statement}, ParsingError};
+use super::{ast::{Identifier, Type}, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, ParsingError};
 
 #[derive(Debug, PartialEq)]
 pub struct Expression {
@@ -13,7 +13,8 @@ pub struct Expression {
 pub enum ExpressionKind {
     Literal(Literal),
     BinaryOp(BinaryOp),
-    Function(Function)
+    Function(Function),
+    Path(Path)
 }
 
 #[derive(Debug, PartialEq)]
@@ -63,15 +64,17 @@ pub struct Block {
 }
 
 /// Parse an expression with syntax:
-/// Expression = <LiteralExpression> | <BinaryOperationExpression> | <FunctionExpression>
+/// Expression = <LiteralExpression> | <BinaryOperationExpression> | <FunctionDeclaration>
 pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     match stream.peek().token_type {
-        TokenType::Function => parse_function_expression(stream),
+        TokenType::Function => parse_function_declaration(stream),
         _ => parse_expression_binding_power(stream, 0)
     }
 }
 
-fn parse_function_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+/// Parse function declaration with syntax:
+/// FunctionDeclaration = fn + ( + <Arg> + (, + <Arg>)* + ) + <Block>
+fn parse_function_declaration(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     expect_token!(stream.next(), TokenType::Function);
     expect_token!(stream.next(), TokenType::ParenOpen);
 
@@ -137,6 +140,9 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
         TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => {
             parse_literal_expression(stream)?
         }
+        TokenType::Identifier(_) => {
+            parse_path_expression(stream)?
+        }
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
     };
 
@@ -177,6 +183,13 @@ fn infix_binding_power(op: &Operator) -> (u8, u8) {
         Operator::Add | Operator::Subtract => (1, 2),
         Operator::Multiply | Operator::Divide => (3, 4),
     }
+}
+
+/// Parse path expression
+/// PathExpression = <Path>
+fn parse_path_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+    let path = parse_path(stream)?;
+    Ok(Expression { kind: ExpressionKind::Path(path) })
 }
 
 /// Parse a literal expression with syntax:
@@ -398,6 +411,35 @@ mod tests {
             Ok(Expression { kind: ExpressionKind::Function(Function {
                 args: vec![],
                 body: Block { statements: vec![] }
+            })})
+        );
+    }
+
+    #[test]
+    fn test_path_in_binary_op() {
+        let span = Span::from(((0, 0), (0, 0)));
+        assert_parsing_result(
+            vec![
+                TokenType::Identifier("a".to_string()),
+                TokenType::Plus,
+                TokenType::Identifier("module".to_string()),
+                TokenType::ColonColon,
+                TokenType::Identifier("b".to_string()),
+                TokenType::Multiply,
+                TokenType::Int(3),
+                TokenType::EOF
+            ], parse_expression,
+            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                op: Operator::Add,
+                left: Box::new(Expression { kind: ExpressionKind::Path(Path { segments: vec![PathSegment { ident: Identifier { name: "a".to_string() } }] }) }),
+                right: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Multiply,
+                    left: Box::new(Expression { kind: ExpressionKind::Path(Path { segments: vec![
+                        PathSegment { ident: Identifier { name: "module".to_string() } },
+                        PathSegment { ident: Identifier { name: "b".to_string() } },
+                    ]})}),
+                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
+                })})
             })})
         );
     }
