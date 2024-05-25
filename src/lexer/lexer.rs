@@ -1,13 +1,13 @@
 use crate::{
     span::{LineColumn, Span},
-    stream::ParsingStream,
+    stream::{peek, ParsingStream},
 };
 
 use super::token::{Token, TokenType};
 
 macro_rules! peek_next {
     ($stream:ident, $x:expr) => {
-        matches!($stream.peek(), $x)
+        matches!(peek!($stream), $x)
     };
 }
 
@@ -115,7 +115,7 @@ impl Lexer {
                     let mut content = String::from(ch);
 
                     loop {
-                        let c = stream.peek();
+                        let c = peek!(stream);
                         if !c.is_alphanumeric() && c != '_' {
                             break;
                         }
@@ -166,7 +166,7 @@ impl Lexer {
                 '\'' => {
                     let mut content = String::new();
                     loop {
-                        let c = stream.peek();
+                        let c = peek!(stream);
                         if c == '\\' {
                             stream.next();
                             let c2 = stream.next();
@@ -197,7 +197,7 @@ impl Lexer {
                     let mut content = String::from(ch);
                     let mut is_float = false;
                     loop {
-                        let c = stream.peek();
+                        let c = peek!(stream);
                         if !c.is_numeric() && c != '.' {
                             break;
                         }

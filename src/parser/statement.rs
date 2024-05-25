@@ -1,7 +1,7 @@
 use crate::{
     lexer::{Token, TokenType},
     parser::{ast::TypeKind, expect_token, expression, path},
-    stream::ParsingStream,
+    stream::{peek, ParsingStream},
 };
 
 use super::{
@@ -38,7 +38,7 @@ pub enum VariableDeclarationKind {
 /// Parse a statement with syntax:
 /// Statement = <LetStatement> | <ExpressionStatement>
 pub fn parse_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
-    match stream.peek().token_type {
+    match peek!(stream).token_type {
         TokenType::Let => parse_let_statement(stream),
         _ => parse_expression_statement(stream),
     }
@@ -93,7 +93,7 @@ fn parse_variable_declaration(
 
     let variable_type = parse_type(stream)?;
 
-    let variable_declaration_kind = match stream.peek().token_type {
+    let variable_declaration_kind = match peek!(stream).token_type {
         TokenType::Eq => {
             stream.next(); // Consume Eq
             VariableDeclarationKind::Init(expression::parse_expression(stream)?)
@@ -115,7 +115,7 @@ fn parse_variable_declaration(
 
 /// Parsing a type
 pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, ParsingError> {
-    let token = stream.peek();
+    let token = peek!(stream);
     let variable_type = match token.token_type {
         TokenType::Colon => {
             stream.next(); // Consume Colon

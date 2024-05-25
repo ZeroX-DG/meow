@@ -1,8 +1,17 @@
 use crate::{
-    lexer::{Token, TokenType}, parser::statement::parse_statement, span::Span, stream::ParsingStream
+    lexer::{Token, TokenType},
+    parser::statement::parse_statement,
+    span::Span,
+    stream::{peek, ParsingStream},
 };
 
-use super::{ast::{Identifier, Type}, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, ParsingError};
+use super::{
+    ast::{Identifier, Type},
+    expect_token,
+    path::{parse_path, Path},
+    statement::{parse_type, Statement},
+    ParsingError,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct Expression {
@@ -15,20 +24,20 @@ pub enum ExpressionKind {
     BinaryOp(BinaryOp),
     UnaryOp(UnaryOp),
     Function(Function),
-    Path(Path)
+    Path(Path),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct UnaryOp {
     pub op: Operator,
-    pub expression: Box<Expression>
+    pub expression: Box<Expression>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct BinaryOp {
     pub op: Operator,
     pub left: Box<Expression>,
-    pub right: Box<Expression>
+    pub right: Box<Expression>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -36,7 +45,7 @@ pub enum Operator {
     Add,
     Subtract,
     Multiply,
-    Divide
+    Divide,
 }
 
 #[derive(Debug, PartialEq)]
@@ -73,22 +82,24 @@ pub struct Block {
 /// Parse an expression with syntax:
 /// Expression = <LiteralExpression> | <BinaryOperationExpression> | <FunctionDeclaration>
 pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
-    match stream.peek().token_type {
+    match peek!(stream).token_type {
         TokenType::Function => parse_function_declaration(stream),
-        _ => parse_expression_binding_power(stream, 0)
+        _ => parse_expression_binding_power(stream, 0),
     }
 }
 
 /// Parse function declaration with syntax:
 /// FunctionDeclaration = fn + ( + <Arg> + (, + <Arg>)* + ) + <Block>
-fn parse_function_declaration(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+fn parse_function_declaration(
+    stream: &mut ParsingStream<Token>,
+) -> Result<Expression, ParsingError> {
     expect_token!(stream.next(), TokenType::Function);
     expect_token!(stream.next(), TokenType::ParenOpen);
 
     let mut args = Vec::new();
 
     loop {
-        match stream.peek().token_type {
+        match peek!(stream).token_type {
             TokenType::Comma => {
                 stream.next();
             }
@@ -99,13 +110,15 @@ fn parse_function_declaration(stream: &mut ParsingStream<Token>) -> Result<Expre
             TokenType::Identifier(_) => {
                 args.push(parse_argument(stream)?);
             }
-            _ => return Err(ParsingError::UnexpectedToken(stream.next()))
+            _ => return Err(ParsingError::UnexpectedToken(stream.next())),
         }
     }
 
     let body = parse_block(stream)?;
 
-    Ok(Expression { kind: ExpressionKind::Function(Function { args, body }) })
+    Ok(Expression {
+        kind: ExpressionKind::Function(Function { args, body }),
+    })
 }
 
 /// Parse an argument with syntax:
@@ -114,12 +127,15 @@ fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, Pars
     let token = stream.next();
     let identifier = match token.token_type {
         TokenType::Identifier(name) => Identifier { name },
-        _ => return Err(ParsingError::UnexpectedToken(token))
+        _ => return Err(ParsingError::UnexpectedToken(token)),
     };
 
     let arg_type = parse_type(stream)?;
 
-    Ok(FunctionArg { identifier, arg_type })
+    Ok(FunctionArg {
+        identifier,
+        arg_type,
+    })
 }
 
 /// Parse a block with syntax:
@@ -130,7 +146,7 @@ fn parse_block(stream: &mut ParsingStream<Token>) -> Result<Block, ParsingError>
     let mut statements = Vec::new();
 
     loop {
-        if stream.peek().token_type == TokenType::CurlyBracketClose {
+        if peek!(stream).token_type == TokenType::CurlyBracketClose {
             stream.next();
             break;
         }
@@ -141,26 +157,23 @@ fn parse_block(stream: &mut ParsingStream<Token>) -> Result<Block, ParsingError>
 }
 
 /// Parse an expression with a specified min binding power for Pratt parsing.
-fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding_power: u8) -> Result<Expression, ParsingError> {
-    let token = stream.peek();
+fn parse_expression_binding_power(
+    stream: &mut ParsingStream<Token>,
+    min_binding_power: u8,
+) -> Result<Expression, ParsingError> {
+    let token = peek!(stream);
     let mut left = match token.token_type {
         TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => {
             parse_literal_expression(stream)?
         }
-        TokenType::Identifier(_) => {
-            parse_path_expression(stream)?
-        }
-        TokenType::ParenOpen => {
-            parse_parenthesised_expression(stream)?
-        }
-        TokenType::Plus | TokenType::Minus => {
-            parse_unary_operation(stream)?
-        }
+        TokenType::Identifier(_) => parse_path_expression(stream)?,
+        TokenType::ParenOpen => parse_parenthesised_expression(stream)?,
+        TokenType::Plus | TokenType::Minus => parse_unary_operation(stream)?,
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
     };
 
     loop {
-        let token = stream.peek();
+        let token = peek!(stream);
         let Some(op) = token_type_to_operator(token.token_type) else {
             break;
         };
@@ -178,8 +191,8 @@ fn parse_expression_binding_power(stream: &mut ParsingStream<Token>, min_binding
             kind: ExpressionKind::BinaryOp(BinaryOp {
                 left: Box::new(left),
                 right: Box::new(right),
-                op
-            })
+                op,
+            }),
         }
     }
 
@@ -192,7 +205,7 @@ fn token_type_to_operator(token_type: TokenType) -> Option<Operator> {
         TokenType::Minus => Some(Operator::Subtract),
         TokenType::Multiply => Some(Operator::Multiply),
         TokenType::Divide => Some(Operator::Divide),
-        _ => None
+        _ => None,
     }
 }
 
@@ -208,7 +221,7 @@ fn infix_binding_power(op: &Operator) -> (u8, u8) {
 fn prefix_binding_power(op: &Operator) -> ((), u8) {
     match op {
         Operator::Add | Operator::Subtract => ((), 5),
-        _ => unreachable!("Invalid operator")
+        _ => unreachable!("Invalid operator"),
     }
 }
 
@@ -216,12 +229,16 @@ fn prefix_binding_power(op: &Operator) -> ((), u8) {
 /// PathExpression = <Path>
 fn parse_path_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     let path = parse_path(stream)?;
-    Ok(Expression { kind: ExpressionKind::Path(path) })
+    Ok(Expression {
+        kind: ExpressionKind::Path(path),
+    })
 }
 
 /// Parse a parenthesised expression
 /// ParenthesisedExpression = ( + <Expression> + )
-fn parse_parenthesised_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
+fn parse_parenthesised_expression(
+    stream: &mut ParsingStream<Token>,
+) -> Result<Expression, ParsingError> {
     expect_token!(stream.next(), TokenType::ParenOpen);
     let expression = parse_expression_binding_power(stream, 0)?;
     expect_token!(stream.next(), TokenType::ParenClose);
@@ -236,15 +253,16 @@ fn parse_unary_operation(stream: &mut ParsingStream<Token>) -> Result<Expression
     let ((), right_binding_power) = prefix_binding_power(&op);
     let right = parse_expression_binding_power(stream, right_binding_power)?;
     Ok(Expression {
-        kind: ExpressionKind::UnaryOp(UnaryOp { op, expression: Box::new(right) })
+        kind: ExpressionKind::UnaryOp(UnaryOp {
+            op,
+            expression: Box::new(right),
+        }),
     })
 }
 
 /// Parse a literal expression with syntax:
 /// LiteralExpression = <Boolean> | <Int> | <Float> | <String>
-fn parse_literal_expression(
-    stream: &mut ParsingStream<Token>,
-) -> Result<Expression, ParsingError> {
+fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     let token = stream.next();
     let kind = match &token.token_type {
         TokenType::Boolean(value) => ExpressionKind::Literal(Literal {
@@ -271,7 +289,15 @@ fn parse_literal_expression(
 
 #[cfg(test)]
 mod tests {
-    use crate::{parser::{ast::TypeKind, path::{Path, PathSegment}, statement::{StatementKind, VariableDeclaration, VariableDeclarationKind}, tests::assert_parsing_result}, span::Span};
+    use crate::{
+        parser::{
+            ast::TypeKind,
+            path::{Path, PathSegment},
+            statement::{StatementKind, VariableDeclaration, VariableDeclarationKind},
+            tests::assert_parsing_result,
+        },
+        span::Span,
+    };
 
     use super::*;
 
@@ -349,18 +375,37 @@ mod tests {
                 TokenType::Int(2),
                 TokenType::Multiply,
                 TokenType::Int(3),
-                TokenType::EOF
+                TokenType::EOF,
             ],
             parse_expression,
-            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                op: Operator::Add,
-                left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(1), span: span.clone() }) }),
-                right: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                    op: Operator::Multiply,
-                    left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(2), span: span.clone() }) }),
-                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
-                })})
-            })})
+            Ok(Expression {
+                kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Add,
+                    left: Box::new(Expression {
+                        kind: ExpressionKind::Literal(Literal {
+                            kind: LiteralKind::Int(1),
+                            span: span.clone(),
+                        }),
+                    }),
+                    right: Box::new(Expression {
+                        kind: ExpressionKind::BinaryOp(BinaryOp {
+                            op: Operator::Multiply,
+                            left: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(2),
+                                    span: span.clone(),
+                                }),
+                            }),
+                            right: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(3),
+                                    span: span.clone(),
+                                }),
+                            }),
+                        }),
+                    }),
+                }),
+            }),
         );
     }
 
@@ -384,32 +429,56 @@ mod tests {
                 TokenType::Int(10),
                 TokenType::SemiConlon,
                 TokenType::CurlyBracketClose,
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::Function(Function {
-                args: vec![
-                    FunctionArg {
-                        identifier: Identifier { name: "hello".to_string() },
-                        arg_type: Type { kind: TypeKind::Infer }
-                    },
-                    FunctionArg {
-                        identifier: Identifier { name: "world".to_string() },
-                        arg_type: Type { kind: TypeKind::TypePath(Path { segments: vec![PathSegment { ident: Identifier { name: "string".to_string() } }] }) }
-                    },
-                ],
-                body: Block {
-                    statements: vec![
-                        Statement { kind: StatementKind::Let(VariableDeclaration {
-                            identifier: Identifier { name: "a".to_string() },
-                            variable_type: Type { kind: TypeKind::Infer },
-                            kind: VariableDeclarationKind::Init(Expression {
-                                kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(10), span })
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Function(Function {
+                    args: vec![
+                        FunctionArg {
+                            identifier: Identifier {
+                                name: "hello".to_string(),
+                            },
+                            arg_type: Type {
+                                kind: TypeKind::Infer,
+                            },
+                        },
+                        FunctionArg {
+                            identifier: Identifier {
+                                name: "world".to_string(),
+                            },
+                            arg_type: Type {
+                                kind: TypeKind::TypePath(Path {
+                                    segments: vec![PathSegment {
+                                        ident: Identifier {
+                                            name: "string".to_string(),
+                                        },
+                                    }],
+                                }),
+                            },
+                        },
+                    ],
+                    body: Block {
+                        statements: vec![Statement {
+                            kind: StatementKind::Let(VariableDeclaration {
+                                identifier: Identifier {
+                                    name: "a".to_string(),
+                                },
+                                variable_type: Type {
+                                    kind: TypeKind::Infer,
+                                },
+                                kind: VariableDeclarationKind::Init(Expression {
+                                    kind: ExpressionKind::Literal(Literal {
+                                        kind: LiteralKind::Int(10),
+                                        span,
+                                    }),
+                                }),
+                                is_mutable: false,
                             }),
-                            is_mutable: false
-                        })}
-                    ]
-                }
-            })})
+                        }],
+                    },
+                }),
+            }),
         );
     }
 
@@ -427,21 +496,38 @@ mod tests {
                 TokenType::ParenClose,
                 TokenType::CurlyBracketOpen,
                 TokenType::CurlyBracketClose,
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::Function(Function {
-                args: vec![
-                    FunctionArg {
-                        identifier: Identifier { name: "hello".to_string() },
-                        arg_type: Type { kind: TypeKind::Infer }
-                    },
-                    FunctionArg {
-                        identifier: Identifier { name: "world".to_string() },
-                        arg_type: Type { kind: TypeKind::TypePath(Path { segments: vec![PathSegment { ident: Identifier { name: "string".to_string() } }] }) }
-                    },
-                ],
-                body: Block { statements: vec![] }
-            })})
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Function(Function {
+                    args: vec![
+                        FunctionArg {
+                            identifier: Identifier {
+                                name: "hello".to_string(),
+                            },
+                            arg_type: Type {
+                                kind: TypeKind::Infer,
+                            },
+                        },
+                        FunctionArg {
+                            identifier: Identifier {
+                                name: "world".to_string(),
+                            },
+                            arg_type: Type {
+                                kind: TypeKind::TypePath(Path {
+                                    segments: vec![PathSegment {
+                                        ident: Identifier {
+                                            name: "string".to_string(),
+                                        },
+                                    }],
+                                }),
+                            },
+                        },
+                    ],
+                    body: Block { statements: vec![] },
+                }),
+            }),
         );
     }
 
@@ -454,12 +540,15 @@ mod tests {
                 TokenType::ParenClose,
                 TokenType::CurlyBracketOpen,
                 TokenType::CurlyBracketClose,
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::Function(Function {
-                args: vec![],
-                body: Block { statements: vec![] }
-            })})
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Function(Function {
+                    args: vec![],
+                    body: Block { statements: vec![] },
+                }),
+            }),
         );
     }
 
@@ -475,20 +564,50 @@ mod tests {
                 TokenType::Identifier("b".to_string()),
                 TokenType::Multiply,
                 TokenType::Int(3),
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                op: Operator::Add,
-                left: Box::new(Expression { kind: ExpressionKind::Path(Path { segments: vec![PathSegment { ident: Identifier { name: "a".to_string() } }] }) }),
-                right: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                    op: Operator::Multiply,
-                    left: Box::new(Expression { kind: ExpressionKind::Path(Path { segments: vec![
-                        PathSegment { ident: Identifier { name: "module".to_string() } },
-                        PathSegment { ident: Identifier { name: "b".to_string() } },
-                    ]})}),
-                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(3), span: span.clone() }) })
-                })})
-            })})
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Add,
+                    left: Box::new(Expression {
+                        kind: ExpressionKind::Path(Path {
+                            segments: vec![PathSegment {
+                                ident: Identifier {
+                                    name: "a".to_string(),
+                                },
+                            }],
+                        }),
+                    }),
+                    right: Box::new(Expression {
+                        kind: ExpressionKind::BinaryOp(BinaryOp {
+                            op: Operator::Multiply,
+                            left: Box::new(Expression {
+                                kind: ExpressionKind::Path(Path {
+                                    segments: vec![
+                                        PathSegment {
+                                            ident: Identifier {
+                                                name: "module".to_string(),
+                                            },
+                                        },
+                                        PathSegment {
+                                            ident: Identifier {
+                                                name: "b".to_string(),
+                                            },
+                                        },
+                                    ],
+                                }),
+                            }),
+                            right: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(3),
+                                    span: span.clone(),
+                                }),
+                            }),
+                        }),
+                    }),
+                }),
+            }),
         );
     }
 
@@ -501,16 +620,31 @@ mod tests {
                 TokenType::Plus,
                 TokenType::Minus,
                 TokenType::Int(5),
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                op: Operator::Add,
-                left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) }),
-                right: Box::new(Expression { kind: ExpressionKind::UnaryOp(UnaryOp {
-                    op: Operator::Subtract,
-                    expression: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) })
-                })})
-            })})
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Add,
+                    left: Box::new(Expression {
+                        kind: ExpressionKind::Literal(Literal {
+                            kind: LiteralKind::Int(5),
+                            span: span.clone(),
+                        }),
+                    }),
+                    right: Box::new(Expression {
+                        kind: ExpressionKind::UnaryOp(UnaryOp {
+                            op: Operator::Subtract,
+                            expression: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(5),
+                                    span: span.clone(),
+                                }),
+                            }),
+                        }),
+                    }),
+                }),
+            }),
         );
     }
 
@@ -526,17 +660,37 @@ mod tests {
                 TokenType::ParenClose,
                 TokenType::Multiply,
                 TokenType::Int(4),
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                op: Operator::Multiply,
-                left: Box::new(Expression { kind: ExpressionKind::BinaryOp(BinaryOp {
-                    op: Operator::Subtract,
-                    left: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) }),
-                    right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(1), span: span.clone() }) }),
-                })}),
-                right: Box::new(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(4), span: span.clone() }) })
-            })})
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::BinaryOp(BinaryOp {
+                    op: Operator::Multiply,
+                    left: Box::new(Expression {
+                        kind: ExpressionKind::BinaryOp(BinaryOp {
+                            op: Operator::Subtract,
+                            left: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(5),
+                                    span: span.clone(),
+                                }),
+                            }),
+                            right: Box::new(Expression {
+                                kind: ExpressionKind::Literal(Literal {
+                                    kind: LiteralKind::Int(1),
+                                    span: span.clone(),
+                                }),
+                            }),
+                        }),
+                    }),
+                    right: Box::new(Expression {
+                        kind: ExpressionKind::Literal(Literal {
+                            kind: LiteralKind::Int(4),
+                            span: span.clone(),
+                        }),
+                    }),
+                }),
+            }),
         );
     }
 
@@ -552,9 +706,15 @@ mod tests {
                 TokenType::ParenClose,
                 TokenType::ParenClose,
                 TokenType::ParenClose,
-                TokenType::EOF
-            ], parse_expression,
-            Ok(Expression { kind: ExpressionKind::Literal(Literal { kind: LiteralKind::Int(5), span: span.clone() }) })
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Literal(Literal {
+                    kind: LiteralKind::Int(5),
+                    span: span.clone(),
+                }),
+            }),
         );
     }
 }

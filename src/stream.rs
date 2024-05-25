@@ -1,22 +1,40 @@
+use std::collections::VecDeque;
+
+macro_rules! peek {
+    ($stream:ident) => {
+        $stream.peek(1)
+    };
+    ($stream:ident, $n:expr) => {
+        $stream.peek($n)
+    };
+}
+
+pub(crate) use peek;
+
 pub struct ParsingStream<'a, T: PartialEq + Clone> {
-    next_item: T,
-    input: &'a mut dyn Iterator<Item=T>,
-    stream_end_item: T
+    input: &'a mut dyn Iterator<Item = T>,
+    stream_end_item: T,
+    buffer: VecDeque<T>,
 }
 
 impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
-    pub fn new(input: &'a mut dyn Iterator<Item=T>, stream_end_item: T) -> Self {
+    pub fn new(input: &'a mut dyn Iterator<Item = T>, stream_end_item: T) -> Self {
+        let first_item = input.next().unwrap_or(stream_end_item.clone());
         Self {
-            next_item: input.next().unwrap_or(stream_end_item.clone()),
             input,
-            stream_end_item
+            stream_end_item,
+            buffer: vec![first_item].into(),
         }
     }
 
     pub fn next(&mut self) -> T {
-        let result = self.next_item.clone();
-        self.next_item = self.input.next().unwrap_or(self.stream_end_item.clone());
-        
+        let result = self.buffer.pop_front().unwrap();
+
+        if self.buffer.is_empty() {
+            self.buffer
+                .push_back(self.input.next().unwrap_or(self.stream_end_item.clone()));
+        }
+
         result
     }
 
@@ -33,7 +51,21 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
         }
     }
 
-    pub fn peek(&mut self) -> T {
-        self.next_item.clone()
+    pub fn peek(&mut self, n: usize) -> T {
+        if n == 0 {
+            unreachable!("Can't peek i + 0 item");
+        }
+
+        if n <= self.buffer.len() {
+            return self.buffer.get(n - 1).unwrap().clone();
+        }
+
+        for _ in 0..n {
+            let item = self.input.next().unwrap_or(self.stream_end_item.clone());
+            self.buffer.push_back(item);
+        }
+
+        return self.buffer.get(n - 1).unwrap().clone();
     }
 }
+

@@ -5,7 +5,10 @@ mod statement;
 
 use std::fmt::Debug;
 
-use crate::{span::Span, stream::ParsingStream};
+use crate::{
+    span::Span,
+    stream::{peek, ParsingStream},
+};
 
 use self::ast::{Identifier, Item, ItemKind, Program};
 
@@ -30,7 +33,12 @@ macro_rules! expect_token {
     ($x:expr, $y:pat) => {
         match &$x.token_type {
             $y => {}
-            _ => return Err(ParsingError::UnexpectedToken($x.clone())),
+            _ => {
+                if !cfg!(test) && cfg!(debug_assertions) {
+                    panic!("Unexpected Token: {:#?}", $x);
+                }
+                return Err(ParsingError::UnexpectedToken($x.clone()));
+            }
         }
     };
 }
@@ -51,7 +59,8 @@ impl Parser {
     /// Parse at the top level of the program
     pub fn parse(tokens: Vec<Token>) -> Result<Program, ParsingError> {
         let mut parser = Parser::new();
-        let last_span = tokens.last()
+        let last_span = tokens
+            .last()
             .cloned()
             .map(|token| token.span)
             .unwrap_or(Span::from(((1, 0), (1, 1))));
@@ -67,7 +76,7 @@ impl Parser {
         );
 
         loop {
-            let token = stream.peek();
+            let token = peek!(stream);
 
             if let TokenType::EOF = token.token_type {
                 break;

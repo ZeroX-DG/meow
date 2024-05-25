@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token, TokenType},
-    stream::ParsingStream,
+    stream::{peek, ParsingStream},
 };
 
 use super::{ast::Identifier, Parser, ParsingError};
@@ -26,7 +26,7 @@ pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingErro
         let segment = parse_path_segment(stream)?;
         path.segments.push(segment);
 
-        match stream.peek().token_type {
+        match peek!(stream).token_type {
             TokenType::ColonColon => {
                 stream.next();
             }
