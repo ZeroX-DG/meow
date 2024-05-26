@@ -6,11 +6,7 @@ use crate::{
 };
 
 use super::{
-    ast::{Identifier, Type},
-    expect_token,
-    path::{parse_path, Path},
-    statement::{parse_type, Statement},
-    ParsingError,
+    ast::{Identifier, Type}, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, Parser, ParsingError
 };
 
 #[derive(Debug, PartialEq)]
@@ -25,6 +21,20 @@ pub enum ExpressionKind {
     UnaryOp(UnaryOp),
     Function(Function),
     Path(Path),
+    Call(Call),
+    MemberAccess(MemberAccess)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MemberAccess {
+    pub object: Box<Expression>,
+    pub member: Identifier
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Call {
+    pub function: Box<Expression>,
+    pub args: Vec<Expression>
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,6 +56,8 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    MemberAccess,
+    FunctionInvocation,
 }
 
 #[derive(Debug, PartialEq)]
@@ -166,7 +178,9 @@ fn parse_expression_binding_power(
         TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => {
             parse_literal_expression(stream)?
         }
-        TokenType::Identifier(_) => parse_path_expression(stream)?,
+        TokenType::Identifier(_) => {
+            parse_path_expression(stream)?
+        },
         TokenType::ParenOpen => parse_parenthesised_expression(stream)?,
         TokenType::Plus | TokenType::Minus => parse_unary_operation(stream)?,
         _ => return Err(ParsingError::UnexpectedToken(token.clone())),
@@ -178,6 +192,45 @@ fn parse_expression_binding_power(
             break;
         };
 
+        if let Some((left_binding_power, ())) = postfix_binding_power(&op) {
+            if left_binding_power < min_binding_power {
+                break;
+            }
+
+            stream.next();
+
+            left = match op {
+                Operator::FunctionInvocation => {
+                    let mut args = Vec::new();
+
+                    if peek!(stream).token_type != TokenType::ParenClose {
+                        loop {
+                            let expr = parse_expression(stream)?;
+                            args.push(expr);
+
+                            if peek!(stream).token_type == TokenType::ParenClose {
+                                break;
+                            }
+
+                            expect_token!(stream.next(), TokenType::Comma);
+                        }
+                    }
+
+                    expect_token!(stream.next(), TokenType::ParenClose);
+
+                    Expression {
+                        kind: ExpressionKind::Call(Call {
+                            function: Box::new(left),
+                            args
+                        })
+                    }
+                },
+                _ => unreachable!("Invalid operator")
+            };
+
+            continue;
+        }
+
         let (left_binding_power, right_binding_power) = infix_binding_power(&op);
 
         if left_binding_power < min_binding_power {
@@ -185,14 +238,24 @@ fn parse_expression_binding_power(
         }
 
         stream.next();
-        let right = parse_expression_binding_power(stream, right_binding_power)?;
 
-        left = Expression {
-            kind: ExpressionKind::BinaryOp(BinaryOp {
-                left: Box::new(left),
-                right: Box::new(right),
-                op,
-            }),
+        left = match op {
+            Operator::MemberAccess => Expression {
+                kind: ExpressionKind::MemberAccess(MemberAccess {
+                    object: Box::new(left),
+                    member: Parser::parse_identifier(stream)?
+                }),
+            },
+            _ => {
+                let right = parse_expression_binding_power(stream, right_binding_power)?;
+                Expression {
+                    kind: ExpressionKind::BinaryOp(BinaryOp {
+                        left: Box::new(left),
+                        right: Box::new(right),
+                        op,
+                    }),
+                }
+            }
         }
     }
 
@@ -205,6 +268,8 @@ fn token_type_to_operator(token_type: TokenType) -> Option<Operator> {
         TokenType::Minus => Some(Operator::Subtract),
         TokenType::Multiply => Some(Operator::Multiply),
         TokenType::Divide => Some(Operator::Divide),
+        TokenType::Period => Some(Operator::MemberAccess),
+        TokenType::ParenOpen => Some(Operator::FunctionInvocation),
         _ => None,
     }
 }
@@ -214,14 +279,24 @@ fn infix_binding_power(op: &Operator) -> (u8, u8) {
     match op {
         Operator::Add | Operator::Subtract => (1, 2),
         Operator::Multiply | Operator::Divide => (3, 4),
+        Operator::MemberAccess => (6, 5),
+        _ => unreachable!("Invalid operator"),
     }
 }
 
-/// Binding power for infix ooperators like add, subtract
+/// Binding power for prefix ooperators like add, subtract
 fn prefix_binding_power(op: &Operator) -> ((), u8) {
     match op {
         Operator::Add | Operator::Subtract => ((), 5),
         _ => unreachable!("Invalid operator"),
+    }
+}
+
+/// Binding power for postfix ooperators like function call
+fn postfix_binding_power(op: &Operator) -> Option<(u8, ())> {
+    match op {
+        Operator::FunctionInvocation => Some((7, ())),
+        _ => None,
     }
 }
 
@@ -714,6 +789,69 @@ mod tests {
                     kind: LiteralKind::Int(5),
                     span: span.clone(),
                 }),
+            }),
+        );
+    }
+
+    #[test]
+    fn test_function_call_expression() {
+        assert_parsing_result(
+            vec![
+                TokenType::Identifier(String::from("a")),
+                TokenType::Period,
+                TokenType::Identifier(String::from("b")),
+                TokenType::Period,
+                TokenType::Identifier(String::from("c")),
+                TokenType::ParenOpen,
+                TokenType::Identifier(String::from("d")),
+                TokenType::Comma,
+                TokenType::Identifier(String::from("f")),
+                TokenType::ParenClose,
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Call(Call {
+                    function: Box::new(Expression {
+                        kind: ExpressionKind::MemberAccess(MemberAccess {
+                            object: Box::new(Expression {
+                                kind: ExpressionKind::MemberAccess(MemberAccess {
+                                    object: Box::new(Expression {
+                                        kind: ExpressionKind::Path(Path {
+                                            segments: vec![PathSegment {
+                                                ident: Identifier {
+                                                    name: String::from("a")
+                                                }
+                                            }]
+                                        })
+                                    }),
+                                    member: Identifier {
+                                        name: String::from("b")
+                                    }
+                                })
+                            }),
+                            member: Identifier {
+                                name: String::from("c")
+                            }
+                        }),
+                    }),
+                    args: vec![
+                        Expression {
+                            kind: ExpressionKind::Path(Path {
+                                segments: vec![PathSegment {
+                                    ident: Identifier { name: String::from("d") }
+                                }]
+                            }),
+                        },
+                        Expression {
+                            kind: ExpressionKind::Path(Path {
+                                segments: vec![PathSegment {
+                                    ident: Identifier { name: String::from("f") }
+                                }]
+                            }),
+                        },
+                    ]
+                })
             }),
         );
     }
