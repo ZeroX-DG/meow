@@ -1,4 +1,7 @@
-use crate::{lexer::{Token, TokenType}, stream::ParsingStream};
+use crate::{
+    lexer::{Token, TokenType},
+    stream::ParsingStream,
+};
 
 use super::{ast::Identifier, expect_token, ParsingError};
 
@@ -12,6 +15,7 @@ pub fn parse_identifier(stream: &mut ParsingStream<Token>) -> Result<Identifier,
     match token.token_type {
         TokenType::Identifier(ident) => Ok(Identifier {
             name: ident.clone(),
+            span: token.span,
         }),
         _ => unreachable!(),
     }

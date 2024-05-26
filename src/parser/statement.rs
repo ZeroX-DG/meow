@@ -77,6 +77,7 @@ fn parse_variable_declaration(
     expect_token!(stream.next(), TokenType::Let);
 
     let variable_name;
+    let variable_name_token_span;
     let mut is_mutable = false;
 
     loop {
@@ -87,6 +88,7 @@ fn parse_variable_declaration(
             }
             TokenType::Identifier(identifier) => {
                 variable_name = identifier.clone();
+                variable_name_token_span = token.span;
                 break;
             }
             _ => {
@@ -109,6 +111,7 @@ fn parse_variable_declaration(
         kind: variable_declaration_kind,
         identifier: Identifier {
             name: variable_name,
+            span: variable_name_token_span,
         },
         variable_type,
         is_mutable,
@@ -133,7 +136,7 @@ pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, Pars
         },
         _ => {
             unexpected_token!(token);
-        },
+        }
     };
 
     Ok(variable_type)
@@ -189,12 +192,16 @@ mod tests {
                         segments: vec![PathSegment {
                             ident: Identifier {
                                 name: String::from("string"),
+                                span: Span::default(),
                             },
+                            span: Span::default(),
                         }],
+                        span: Span::default(),
                     }),
                 },
                 identifier: Identifier {
                     name: String::from("hello"),
+                    span: Span::default(),
                 },
                 kind: VariableDeclarationKind::Declaration,
                 is_mutable: false,
@@ -222,12 +229,16 @@ mod tests {
                         segments: vec![PathSegment {
                             ident: Identifier {
                                 name: String::from("string"),
+                                span: Span::default(),
                             },
+                            span: Span::default(),
                         }],
+                        span: Span::default(),
                     }),
                 },
                 identifier: Identifier {
                     name: String::from("hello"),
+                    span: Span::default(),
                 },
                 kind: VariableDeclarationKind::Declaration,
                 is_mutable: true,
@@ -253,6 +264,7 @@ mod tests {
                 },
                 identifier: Identifier {
                     name: String::from("hello"),
+                    span: Span::default(),
                 },
                 kind: VariableDeclarationKind::Declaration,
                 is_mutable: true,
@@ -282,18 +294,23 @@ mod tests {
                         segments: vec![PathSegment {
                             ident: Identifier {
                                 name: String::from("string"),
+                                span: Span::default(),
                             },
+                            span: Span::default(),
                         }],
+                        span: Span::default(),
                     }),
                 },
                 identifier: Identifier {
                     name: String::from("hello"),
+                    span: Span::default(),
                 },
                 kind: VariableDeclarationKind::Init(Expression {
                     kind: ExpressionKind::Literal(Literal {
                         kind: LiteralKind::String(String::from("hello")),
-                        span: Span::from(((0, 0), (0, 0))),
+                        span: Span::default(),
                     }),
+                    span: Span::default(),
                 }),
                 is_mutable: true,
             }),
@@ -321,12 +338,14 @@ mod tests {
                 },
                 identifier: Identifier {
                     name: String::from("hello"),
+                    span: Span::default(),
                 },
                 kind: VariableDeclarationKind::Init(Expression {
                     kind: ExpressionKind::Literal(Literal {
                         kind: LiteralKind::String(String::from("hello")),
-                        span: Span::from(((0, 0), (0, 0))),
+                        span: Span::default(),
                     }),
+                    span: Span::default(),
                 }),
                 is_mutable: true,
             }),

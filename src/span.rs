@@ -26,3 +26,9 @@ impl From<((usize, usize), (usize, usize))> for Span {
         }
     }
 }
+
+impl Default for Span {
+    fn default() -> Self {
+        Self::from(((0, 0), (0, 0)))
+    }
+}

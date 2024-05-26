@@ -15,20 +15,27 @@ pub struct ParsingStream<'a, T: PartialEq + Clone> {
     input: &'a mut dyn Iterator<Item = T>,
     stream_end_item: T,
     buffer: VecDeque<T>,
+    current: Option<T>,
 }
 
 impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
     pub fn new(input: &'a mut dyn Iterator<Item = T>, stream_end_item: T) -> Self {
         let first_item = input.next().unwrap_or(stream_end_item.clone());
         Self {
+            current: None,
             input,
             stream_end_item,
             buffer: vec![first_item].into(),
         }
     }
 
+    pub fn current(&self) -> &Option<T> {
+        &self.current
+    }
+
     pub fn next(&mut self) -> T {
         let result = self.buffer.pop_front().unwrap();
+        self.current = Some(result.clone());
 
         if self.buffer.is_empty() {
             self.buffer
@@ -68,4 +75,3 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
         return self.buffer.get(n - 1).unwrap().clone();
     }
 }
-

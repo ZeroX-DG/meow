@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::span::Span;
+
 pub use super::expression::{Expression, ExpressionKind, Literal, LiteralKind};
 pub use super::path::{Path, PathSegment};
 pub use super::statement::{
@@ -24,6 +26,7 @@ pub enum ItemKind {
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Identifier {
     pub name: String,
+    pub span: Span,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
