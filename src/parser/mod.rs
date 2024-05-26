@@ -35,16 +35,23 @@ macro_rules! expect_token {
         match &$x.token_type {
             $y => {}
             _ => {
-                if !cfg!(test) && cfg!(debug_assertions) {
-                    panic!("Unexpected Token: {:#?}", $x);
-                }
-                return Err(ParsingError::UnexpectedToken($x.clone()));
+                super::unexpected_token!($x);
             }
         }
     };
 }
 
+macro_rules! unexpected_token {
+    ($x:expr) => {
+        if !cfg!(test) && cfg!(debug_assertions) {
+            panic!("Unexpected Token: {:#?}", $x);
+        }
+        return Err(ParsingError::UnexpectedToken($x.clone()));
+    };
+}
+
 pub(crate) use expect_token;
+pub(crate) use unexpected_token;
 
 pub struct Parser {
     pub program: Program,

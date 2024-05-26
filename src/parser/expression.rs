@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    ast::{Identifier, Type}, basics::parse_identifier, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, ParsingError
+    ast::{Identifier, Type}, basics::parse_identifier, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, unexpected_token, ParsingError
 };
 
 #[derive(Debug, PartialEq)]
@@ -111,7 +111,8 @@ fn parse_function_declaration(
     let mut args = Vec::new();
 
     loop {
-        match peek!(stream).token_type {
+        let token = peek!(stream);
+        match token.token_type {
             TokenType::Comma => {
                 stream.next();
             }
@@ -122,7 +123,9 @@ fn parse_function_declaration(
             TokenType::Identifier(_) => {
                 args.push(parse_argument(stream)?);
             }
-            _ => return Err(ParsingError::UnexpectedToken(stream.next())),
+            _ => {
+                unexpected_token!(token);
+            }
         }
     }
 
@@ -139,7 +142,9 @@ fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, Pars
     let token = stream.next();
     let identifier = match token.token_type {
         TokenType::Identifier(name) => Identifier { name },
-        _ => return Err(ParsingError::UnexpectedToken(token)),
+        _ => {
+            unexpected_token!(token);
+        }
     };
 
     let arg_type = parse_type(stream)?;
@@ -183,7 +188,9 @@ fn parse_expression_binding_power(
         },
         TokenType::ParenOpen => parse_parenthesised_expression(stream)?,
         TokenType::Plus | TokenType::Minus => parse_unary_operation(stream)?,
-        _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+        _ => {
+            unexpected_token!(token);
+        },
     };
 
     loop {
@@ -356,7 +363,9 @@ fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Express
             kind: LiteralKind::String(value.to_owned()),
             span: token.span,
         }),
-        _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+        _ => {
+            unexpected_token!(token);
+        }
     };
 
     Ok(Expression { kind })

@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Token, TokenType},
-    parser::{ast::TypeKind, expect_token, expression, path},
+    parser::{ast::TypeKind, expect_token, expression, path, unexpected_token},
     stream::{peek, ParsingStream},
 };
 
@@ -87,7 +87,9 @@ fn parse_variable_declaration(
                 variable_name = identifier.clone();
                 break;
             }
-            _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+            _ => {
+                unexpected_token!(token);
+            }
         }
     }
 
@@ -127,7 +129,9 @@ pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, Pars
         TokenType::Eq | TokenType::SemiConlon | TokenType::Comma => Type {
             kind: TypeKind::Infer,
         },
-        _ => return Err(ParsingError::UnexpectedToken(token.clone())),
+        _ => {
+            unexpected_token!(token);
+        },
     };
 
     Ok(variable_type)
