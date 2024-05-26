@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::{
     lexer::{Token, TokenType},
     parser::statement::parse_statement,
@@ -9,12 +11,12 @@ use super::{
     ast::{Identifier, Type}, basics::parse_identifier, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, unexpected_token, ParsingError
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Expression {
     pub kind: ExpressionKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum ExpressionKind {
     Literal(Literal),
     BinaryOp(BinaryOp),
@@ -25,32 +27,32 @@ pub enum ExpressionKind {
     MemberAccess(MemberAccess)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct MemberAccess {
     pub object: Box<Expression>,
     pub member: Identifier
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Call {
     pub function: Box<Expression>,
     pub args: Vec<Expression>
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct UnaryOp {
     pub op: Operator,
     pub expression: Box<Expression>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct BinaryOp {
     pub op: Operator,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum Operator {
     Add,
     Subtract,
@@ -60,13 +62,13 @@ pub enum Operator {
     FunctionInvocation,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Literal {
     pub kind: LiteralKind,
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum LiteralKind {
     Int(i64),
     Float(f64),
@@ -74,19 +76,19 @@ pub enum LiteralKind {
     Boolean(bool),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Function {
     pub args: Vec<FunctionArg>,
     pub body: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct FunctionArg {
     pub identifier: Identifier,
     pub arg_type: Type,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }

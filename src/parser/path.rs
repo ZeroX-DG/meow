@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::{
     lexer::{Token, TokenType},
     stream::{peek, ParsingStream},
@@ -5,12 +7,12 @@ use crate::{
 
 use super::{ast::Identifier, basics::parse_identifier, ParsingError};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct PathSegment {
     pub ident: Identifier,
 }

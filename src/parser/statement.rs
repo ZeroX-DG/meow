@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::{
     lexer::{Token, TokenType},
     parser::{ast::TypeKind, expect_token, expression, path, unexpected_token},
@@ -10,18 +12,18 @@ use super::{
     ParsingError,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct Statement {
     pub kind: StatementKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum StatementKind {
     Let(VariableDeclaration),
     Expr(Expression),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct VariableDeclaration {
     pub identifier: Identifier,
     pub variable_type: Type,
@@ -29,7 +31,7 @@ pub struct VariableDeclaration {
     pub is_mutable: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum VariableDeclarationKind {
     Declaration,
     Init(Expression),

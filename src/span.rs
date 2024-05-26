@@ -1,10 +1,12 @@
-#[derive(Debug, PartialEq, Eq, Clone)]
+use serde::Serialize;
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Span {
     pub start: LineColumn,
     pub end: LineColumn,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct LineColumn {
     pub line: usize,
     pub column: usize,
