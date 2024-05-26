@@ -2,6 +2,7 @@ pub mod ast;
 mod expression;
 mod path;
 mod statement;
+mod basics;
 
 use std::fmt::Debug;
 
@@ -10,7 +11,7 @@ use crate::{
     stream::{peek, ParsingStream},
 };
 
-use self::ast::{Identifier, Item, ItemKind, Program};
+use self::ast::{Item, ItemKind, Program};
 
 use super::lexer::{Token, TokenType};
 
@@ -89,18 +90,6 @@ impl Parser {
         }
 
         return Ok(parser.program);
-    }
-
-    /// Parse an identiifier with syntax:
-    /// Identifier = <Identifier>
-    fn parse_identifier(stream: &mut ParsingStream<Token>) -> Result<Identifier, ParsingError> {
-        let token = stream.next();
-        match token.token_type {
-            TokenType::Identifier(ident) => Ok(Identifier {
-                name: ident.clone(),
-            }),
-            _ => Err(ParsingError::UnexpectedToken(token.clone())),
-        }
     }
 }
 

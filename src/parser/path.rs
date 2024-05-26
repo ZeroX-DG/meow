@@ -3,7 +3,7 @@ use crate::{
     stream::{peek, ParsingStream},
 };
 
-use super::{ast::Identifier, Parser, ParsingError};
+use super::{ast::Identifier, basics::parse_identifier, ParsingError};
 
 #[derive(Debug, PartialEq)]
 pub struct Path {
@@ -40,7 +40,7 @@ pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingErro
 /// Parse a path with syntax:
 /// PathSegment = <Identifier>
 pub fn parse_path_segment(stream: &mut ParsingStream<Token>) -> Result<PathSegment, ParsingError> {
-    let ident = Parser::parse_identifier(stream)?;
+    let ident = parse_identifier(stream)?;
     Ok(PathSegment { ident })
 }
 

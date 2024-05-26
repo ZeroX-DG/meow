@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    ast::{Identifier, Type}, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, Parser, ParsingError
+    ast::{Identifier, Type}, basics::parse_identifier, expect_token, path::{parse_path, Path}, statement::{parse_type, Statement}, ParsingError
 };
 
 #[derive(Debug, PartialEq)]
@@ -243,7 +243,7 @@ fn parse_expression_binding_power(
             Operator::MemberAccess => Expression {
                 kind: ExpressionKind::MemberAccess(MemberAccess {
                     object: Box::new(left),
-                    member: Parser::parse_identifier(stream)?
+                    member: parse_identifier(stream)?
                 }),
             },
             _ => {
