@@ -2,11 +2,9 @@ use serde::Serialize;
 
 use crate::span::Span;
 
-pub use super::expression::{Expression, ExpressionKind, Literal, LiteralKind};
-pub use super::path::{Path, PathSegment};
-pub use super::statement::{
-    Statement, StatementKind, VariableDeclaration, VariableDeclarationKind,
-};
+pub use super::expression::*;
+pub use super::path::*;
+pub use super::statement::*;
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Program {
