@@ -1,30 +1,29 @@
-use std::marker::PhantomData;
-
 use crate::parser::ast::{
     BinaryOp, Call, Expression, Function, Item, Literal, Path, Program, Statement,
     VariableDeclaration,
 };
 
 pub trait TargetCompiler {
-    fn compile_item(item: Item) -> String;
-    fn compile_variable_declaration(var_declaration: VariableDeclaration) -> String;
-    fn compile_expression(expr: Expression) -> String;
-    fn compile_literal(literal: Literal) -> String;
-    fn compile_function(function: Function) -> String;
-    fn compile_statement(statement: Statement) -> String;
-    fn compile_call(call: Call) -> String;
-    fn compile_path(path: Path) -> String;
-    fn compile_binary_op(op: BinaryOp) -> String;
+    fn new() -> Self;
+    fn compile_item(&mut self, item: Item) -> String;
+    fn compile_variable_declaration(&mut self, var_declaration: VariableDeclaration) -> String;
+    fn compile_expression(&mut self, expr: Expression) -> String;
+    fn compile_literal(&mut self, literal: Literal) -> String;
+    fn compile_function(&mut self, function: Function) -> String;
+    fn compile_statement(&mut self, statement: Statement) -> String;
+    fn compile_call(&mut self, call: Call) -> String;
+    fn compile_path(&mut self, path: Path) -> String;
+    fn compile_binary_op(&mut self, op: BinaryOp) -> String;
 }
 
 pub struct Compiler<T: TargetCompiler> {
-    __target: PhantomData<T>,
+    target_compiler: T,
 }
 
-impl<Target: TargetCompiler> Compiler<Target> {
+impl<T: TargetCompiler> Compiler<T> {
     fn new() -> Self {
         Self {
-            __target: PhantomData::default(),
+            target_compiler: T::new(),
         }
     }
 
@@ -37,7 +36,7 @@ impl<Target: TargetCompiler> Compiler<Target> {
         let mut compiled_program = String::new();
 
         for item in program.items {
-            let compiled_item = Target::compile_item(item);
+            let compiled_item = self.target_compiler.compile_item(item);
             compiled_program.push_str(&compiled_item);
         }
         compiled_program
