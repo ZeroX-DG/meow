@@ -1,5 +1,5 @@
 use crate::parser::ast::{
-    ExpressionKind, LiteralKind, Operator, StatementKind, VariableDeclarationKind,
+    ExpressionKind, ItemKind, LiteralKind, Operator, StatementKind, VariableDeclarationKind,
 };
 
 use super::TargetCompiler;
@@ -8,6 +8,19 @@ use std::fmt::Write;
 pub struct JavaScriptCompiler;
 
 impl TargetCompiler for JavaScriptCompiler {
+    fn compile_item(item: crate::parser::ast::Item) -> String {
+        let mut compiled_item = match item.kind {
+            ItemKind::Statement(statement) => match statement.kind {
+                StatementKind::Let(variable_declaration) => {
+                    Self::compile_variable_declaration(variable_declaration)
+                }
+                StatementKind::Expr(expr) => Self::compile_expression(expr),
+            },
+        };
+        compiled_item.push(';');
+        compiled_item
+    }
+
     fn compile_variable_declaration(
         var_declaration: crate::parser::ast::VariableDeclaration,
     ) -> String {
@@ -84,7 +97,7 @@ impl TargetCompiler for JavaScriptCompiler {
             .collect::<Vec<String>>()
             .join(";");
 
-        format!("({})=>{{ {}; }}", args, body)
+        format!("({})=>{{{};}}", args, body)
     }
 
     fn compile_statement(statement: crate::parser::ast::Statement) -> String {
