@@ -1,9 +1,19 @@
 use std::marker::PhantomData;
 
-use crate::parser::ast::{Function, ItemKind, Program, StatementKind, VariableDeclaration};
+use crate::parser::ast::{
+    BinaryOp, Call, Expression, Function, ItemKind, Literal, Path, Program, Statement,
+    StatementKind, VariableDeclaration,
+};
 
 pub trait TargetCompiler {
     fn compile_variable_declaration(var_declaration: VariableDeclaration) -> String;
+    fn compile_expression(expr: Expression) -> String;
+    fn compile_literal(literal: Literal) -> String;
+    fn compile_function(function: Function) -> String;
+    fn compile_statement(statement: Statement) -> String;
+    fn compile_call(call: Call) -> String;
+    fn compile_path(path: Path) -> String;
+    fn compile_binary_op(op: BinaryOp) -> String;
 }
 
 pub struct Compiler<T: TargetCompiler> {
@@ -38,12 +48,12 @@ impl<Target: TargetCompiler> Compiler<Target> {
                     StatementKind::Let(variable_declaration) => {
                         self.compile_variable_declaration(variable_declaration)
                     }
-                    _ => String::new(),
+                    StatementKind::Expr(expr) => self.compile_expression(expr),
                 },
-                _ => String::new(),
             };
 
             compiled_program.push_str(&compiled_item);
+            compiled_program.push(';');
         }
         compiled_program
     }
@@ -53,5 +63,9 @@ impl<Target: TargetCompiler> Compiler<Target> {
         variable_declaration: VariableDeclaration,
     ) -> String {
         Target::compile_variable_declaration(variable_declaration)
+    }
+
+    fn compile_expression(&mut self, expression: Expression) -> String {
+        Target::compile_expression(expression)
     }
 }
