@@ -22,5 +22,18 @@ fn main() {
 
     let output = meowscript::compiler::Compiler::<JavaScriptCompiler>::compile(ast);
 
+    println!("Compiled:");
     println!("{}", output);
+    println!("--------");
+    println!("Execution:");
+
+    let executed = std::process::Command::new("node")
+        .arg("-e")
+        .arg(output)
+        .output()
+        .unwrap();
+
+    println!("{}", unsafe {
+        String::from_utf8_unchecked(executed.stdout)
+    });
 }
