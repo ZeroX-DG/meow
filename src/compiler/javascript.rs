@@ -14,12 +14,7 @@ impl TargetCompiler for JavaScriptCompiler {
 
     fn compile_item(&mut self, item: crate::parser::ast::Item) -> String {
         let mut compiled_item = match item.kind {
-            ItemKind::Statement(statement) => match statement.kind {
-                StatementKind::Let(variable_declaration) => {
-                    self.compile_variable_declaration(variable_declaration)
-                }
-                StatementKind::Expr(expr) => self.compile_expression(expr),
-            },
+            ItemKind::Statement(statement) => self.compile_statement(statement),
         };
         compiled_item.push(';');
         compiled_item
@@ -109,6 +104,7 @@ impl TargetCompiler for JavaScriptCompiler {
         match statement.kind {
             StatementKind::Let(var_dclr) => self.compile_variable_declaration(var_dclr),
             StatementKind::Expr(expr) => self.compile_expression(expr),
+            StatementKind::Return(expr) => format!("return {}", self.compile_expression(expr)),
         }
     }
 

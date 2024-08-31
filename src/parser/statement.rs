@@ -21,6 +21,7 @@ pub struct Statement {
 pub enum StatementKind {
     Let(VariableDeclaration),
     Expr(Expression),
+    Return(Expression),
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -42,6 +43,7 @@ pub enum VariableDeclarationKind {
 pub fn parse_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
     match peek!(stream).token_type {
         TokenType::Let => parse_let_statement(stream),
+        TokenType::Return => parse_return_statement(stream),
         _ => parse_expression_statement(stream),
     }
 }
@@ -55,6 +57,17 @@ fn parse_expression_statement(
     expect_token!(stream.next(), TokenType::SemiConlon);
     Ok(Statement {
         kind: StatementKind::Expr(expression),
+    })
+}
+
+/// Parse an ReturnStatement with syntax:
+/// ReturnStatement = <Return> + <Expression> + ;
+fn parse_return_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
+    expect_token!(stream.next(), TokenType::Return);
+    let expression = expression::parse_expression(stream)?;
+    expect_token!(stream.next(), TokenType::SemiConlon);
+    Ok(Statement {
+        kind: StatementKind::Return(expression),
     })
 }
 
