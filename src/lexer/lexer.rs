@@ -67,6 +67,10 @@ impl Lexer {
                 '/' => lexer.push_token(lexer.char_span(), TokenType::Divide),
                 '*' => lexer.push_token(lexer.char_span(), TokenType::Multiply),
                 '+' => lexer.push_token(lexer.char_span(), TokenType::Plus),
+                '-' if peek_next!(stream, '>') => {
+                    lexer.push_token(lexer.line_span(2), TokenType::ThinArrow);
+                    stream.next();
+                }
                 '-' => lexer.push_token(lexer.char_span(), TokenType::Minus),
                 '%' => lexer.push_token(lexer.char_span(), TokenType::Mod),
                 '|' if peek_next!(stream, '|') => {

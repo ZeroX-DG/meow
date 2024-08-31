@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenType},
-    parser::statement::parse_statement,
+    parser::{ast::TypeKind, statement::parse_statement},
     span::Span,
     stream::{peek, ParsingStream},
 };
@@ -86,6 +86,7 @@ pub enum LiteralKind {
 pub struct Function {
     pub args: Vec<FunctionArg>,
     pub body: Block,
+    pub return_type: Type,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -109,7 +110,7 @@ pub fn parse_expression(stream: &mut ParsingStream<Token>) -> Result<Expression,
 }
 
 /// Parse function declaration with syntax:
-/// FunctionDeclaration = fn + ( + <Arg> + (, + <Arg>)* + ) + <Block>
+/// FunctionDeclaration = fn + ( + <Arg> + (, + <Arg>)* + ) + (: <Type>)* + <Block>
 fn parse_function_declaration(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Expression, ParsingError> {
@@ -141,12 +142,27 @@ fn parse_function_declaration(
         }
     }
 
+    let mut return_type = Type {
+        kind: crate::parser::ast::TypeKind::Nothing,
+    };
+
+    if let TokenType::ThinArrow = peek!(stream).token_type {
+        stream.next();
+        return_type = Type {
+            kind: TypeKind::TypePath(parse_path(stream)?),
+        };
+    }
+
     let body = parse_block(stream)?;
 
     let end_location = stream.current().clone().unwrap().span.end;
 
     Ok(Expression {
-        kind: ExpressionKind::Function(Function { args, body }),
+        kind: ExpressionKind::Function(Function {
+            args,
+            body,
+            return_type,
+        }),
         span: Span {
             start: start_location,
             end: end_location,
@@ -629,6 +645,9 @@ mod tests {
                             }),
                         }],
                     },
+                    return_type: Type {
+                        kind: TypeKind::Nothing,
+                    },
                 }),
                 span: Span::default(),
             }),
@@ -684,6 +703,9 @@ mod tests {
                         },
                     ],
                     body: Block { statements: vec![] },
+                    return_type: Type {
+                        kind: TypeKind::Nothing,
+                    },
                 }),
                 span: Span::default(),
             }),
@@ -706,6 +728,45 @@ mod tests {
                 kind: ExpressionKind::Function(Function {
                     args: vec![],
                     body: Block { statements: vec![] },
+                    return_type: Type {
+                        kind: TypeKind::Nothing,
+                    },
+                }),
+                span: Span::default(),
+            }),
+        );
+    }
+
+    #[test]
+    fn test_parse_return_type_function() {
+        assert_parsing_result(
+            vec![
+                TokenType::Function,
+                TokenType::ParenOpen,
+                TokenType::ParenClose,
+                TokenType::ThinArrow,
+                TokenType::Identifier("number".to_string()),
+                TokenType::CurlyBracketOpen,
+                TokenType::CurlyBracketClose,
+                TokenType::EOF,
+            ],
+            parse_expression,
+            Ok(Expression {
+                kind: ExpressionKind::Function(Function {
+                    args: vec![],
+                    body: Block { statements: vec![] },
+                    return_type: Type {
+                        kind: TypeKind::TypePath(Path {
+                            segments: vec![PathSegment {
+                                ident: Identifier {
+                                    name: "number".to_string(),
+                                    span: Span::default(),
+                                },
+                                span: Span::default(),
+                            }],
+                            span: Span::default(),
+                        }),
+                    },
                 }),
                 span: Span::default(),
             }),

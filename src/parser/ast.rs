@@ -36,4 +36,5 @@ pub struct Type {
 pub enum TypeKind {
     Infer,
     TypePath(Path),
+    Nothing,
 }

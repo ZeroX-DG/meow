@@ -36,6 +36,7 @@ pub enum TokenType {
     GreaterEq,
     LessEq,
     FatArrow,
+    ThinArrow,
 
     // Delimiters
     Comma,
