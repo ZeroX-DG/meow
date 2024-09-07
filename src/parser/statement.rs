@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenType},
-    parser::{ast::TypeKind, expect_token, expression, path, unexpected_token},
+    parser::{ast::TypeKind, basics, expect_token, expression, path, unexpected_token},
     stream::{peek, ParsingStream},
 };
 
@@ -20,8 +20,15 @@ pub struct Statement {
 #[derive(Debug, PartialEq, Serialize)]
 pub enum StatementKind {
     Let(VariableDeclaration),
+    Assignment(Assignment),
     Expr(Expression),
     Return(Expression),
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct Assignment {
+    pub identifier: Identifier,
+    pub expression: Expression,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -44,8 +51,28 @@ pub fn parse_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, P
     match peek!(stream).token_type {
         TokenType::Let => parse_let_statement(stream),
         TokenType::Return => parse_return_statement(stream),
+        TokenType::Identifier(_) if peek!(stream, 2).token_type == TokenType::Eq => {
+            parse_assignment_statement(stream)
+        }
         _ => parse_expression_statement(stream),
     }
+}
+
+/// Parse an AssignmentStatement with syntax:
+/// AssignmentStatement = <Identifier> = <Expression> + ;
+fn parse_assignment_statement(
+    stream: &mut ParsingStream<Token>,
+) -> Result<Statement, ParsingError> {
+    let identifier = basics::parse_identifier(stream)?;
+    expect_token!(stream.next(), TokenType::Eq);
+    let expression = expression::parse_expression(stream)?;
+    expect_token!(stream.next(), TokenType::SemiConlon);
+    Ok(Statement {
+        kind: StatementKind::Assignment(Assignment {
+            identifier,
+            expression,
+        }),
+    })
 }
 
 /// Parse an ExpressionStatement with syntax:

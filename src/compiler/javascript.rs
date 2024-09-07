@@ -104,8 +104,17 @@ impl TargetCompiler for JavaScriptCompiler {
         match statement.kind {
             StatementKind::Let(var_dclr) => self.compile_variable_declaration(var_dclr),
             StatementKind::Expr(expr) => self.compile_expression(expr),
+            StatementKind::Assignment(assignment) => self.compile_assignment(assignment),
             StatementKind::Return(expr) => format!("return {}", self.compile_expression(expr)),
         }
+    }
+
+    fn compile_assignment(&mut self, assingment: crate::parser::ast::Assignment) -> String {
+        format!(
+            "{}={}",
+            assingment.identifier.name,
+            self.compile_expression(assingment.expression)
+        )
     }
 
     fn compile_call(&mut self, call: crate::parser::ast::Call) -> String {

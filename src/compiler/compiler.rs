@@ -1,5 +1,5 @@
 use crate::parser::ast::{
-    BinaryOp, Call, Expression, Function, Item, Literal, Path, Program, Statement,
+    Assignment, BinaryOp, Call, Expression, Function, Item, Literal, Path, Program, Statement,
     VariableDeclaration,
 };
 
@@ -14,6 +14,7 @@ pub trait TargetCompiler {
     fn compile_call(&mut self, call: Call) -> String;
     fn compile_path(&mut self, path: Path) -> String;
     fn compile_binary_op(&mut self, op: BinaryOp) -> String;
+    fn compile_assignment(&mut self, assignment: Assignment) -> String;
 }
 
 pub struct Compiler<T: TargetCompiler> {
