@@ -4,11 +4,22 @@ use crate::span::Span;
 pub struct Token {
     pub span: Span,
     pub token_type: TokenType,
+    pub token_data: TokenData,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenData {
+    Identifier(String),
+    Int(i64),
+    Float(f64),
+    String(String),
+    Boolean(bool),
+    None,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
-    Identifier(String),
+    Identifier,
 
     // Keywords
     Function,
@@ -52,10 +63,10 @@ pub enum TokenType {
     ColonColon,
 
     // Literals
-    Int(i64),
-    Float(f64),
-    String(String),
-    Boolean(bool),
+    Int,
+    Float,
+    String,
+    Boolean,
 
     EOF,
 }

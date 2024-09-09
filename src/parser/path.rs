@@ -59,7 +59,10 @@ pub fn parse_path_segment(stream: &mut ParsingStream<Token>) -> Result<PathSegme
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::tests::assert_parsing_result;
+    use crate::{
+        lexer::TokenData,
+        parser::tests::{assert_parsing_result, make_token},
+    };
 
     use super::*;
 
@@ -68,9 +71,15 @@ mod tests {
         // std::string
         assert_parsing_result(
             vec![
-                TokenType::Identifier(String::from("std")),
-                TokenType::ColonColon,
-                TokenType::Identifier(String::from("string")),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("std")),
+                ),
+                make_token(TokenType::ColonColon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("string")),
+                ),
             ],
             parse_path,
             Ok(Path {

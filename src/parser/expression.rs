@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::{
-    lexer::{Token, TokenType},
-    parser::{ast::TypeKind, statement::parse_statement},
+    lexer::{Token, TokenData, TokenType},
+    parser::{ast::TypeKind, match_token, statement::parse_statement},
     span::Span,
     stream::{peek, ParsingStream},
 };
@@ -13,7 +13,7 @@ use super::{
     expect_token,
     path::{parse_path, Path},
     statement::{parse_type, Statement},
-    unexpected_token, ParsingError,
+    ParsingError,
 };
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -115,31 +115,28 @@ fn parse_function_declaration(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Expression, ParsingError> {
     let start_token = stream.next();
-    expect_token!(start_token, TokenType::Function);
+    expect_token!(&start_token, [Function]);
 
     let start_location = start_token.span.start;
 
-    expect_token!(stream.next(), TokenType::ParenOpen);
+    expect_token!(&stream.next(), [ParenOpen]);
 
     let mut args = Vec::new();
 
     loop {
         let token = peek!(stream);
-        match token.token_type {
-            TokenType::Comma => {
+        match_token!(&token, {
+            Comma => {
                 stream.next();
-            }
-            TokenType::ParenClose => {
+            },
+            ParenClose => {
                 stream.next();
                 break;
-            }
-            TokenType::Identifier(_) => {
+            },
+            Identifier => {
                 args.push(parse_argument(stream)?);
             }
-            _ => {
-                unexpected_token!(token);
-            }
-        }
+        });
     }
 
     let mut return_type = Type {
@@ -174,14 +171,15 @@ fn parse_function_declaration(
 /// Arg = <Identifer> + : + <Type>
 fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, ParsingError> {
     let token = stream.next();
-    let identifier = match token.token_type {
-        TokenType::Identifier(name) => Identifier {
+
+    expect_token!(&token, [Identifier]);
+
+    let identifier = match token.token_data {
+        TokenData::Identifier(name) => Identifier {
             name,
             span: token.span,
         },
-        _ => {
-            unexpected_token!(token);
-        }
+        _ => unreachable!(),
     };
 
     let arg_type = parse_type(stream)?;
@@ -195,7 +193,7 @@ fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, Pars
 /// Parse a block with syntax:
 /// Block = { + <Statements> + }
 fn parse_block(stream: &mut ParsingStream<Token>) -> Result<Block, ParsingError> {
-    expect_token!(stream.next(), TokenType::CurlyBracketOpen);
+    expect_token!(&stream.next(), [CurlyBracketOpen]);
 
     let mut statements = Vec::new();
 
@@ -216,17 +214,15 @@ fn parse_expression_binding_power(
     min_binding_power: u8,
 ) -> Result<Expression, ParsingError> {
     let token = peek!(stream);
-    let mut left = match token.token_type {
-        TokenType::Boolean(_) | TokenType::Int(_) | TokenType::Float(_) | TokenType::String(_) => {
+
+    let mut left = match_token!(token, {
+        Boolean | Int | Float | String => {
             parse_literal_expression(stream)?
-        }
-        TokenType::Identifier(_) => parse_path_expression(stream)?,
-        TokenType::ParenOpen => parse_parenthesised_expression(stream)?,
-        TokenType::Plus | TokenType::Minus => parse_unary_operation(stream)?,
-        _ => {
-            unexpected_token!(token);
-        }
-    };
+        },
+        Identifier => parse_path_expression(stream)?,
+        ParenOpen => parse_parenthesised_expression(stream)?,
+        Plus | Minus => parse_unary_operation(stream)?
+    });
 
     loop {
         let token = peek!(stream);
@@ -254,12 +250,12 @@ fn parse_expression_binding_power(
                                 break;
                             }
 
-                            expect_token!(stream.next(), TokenType::Comma);
+                            expect_token!(&stream.next(), [Comma]);
                         }
                     }
 
                     let end_token = stream.next();
-                    expect_token!(end_token, TokenType::ParenClose);
+                    expect_token!(&end_token, [ParenClose]);
 
                     let start_location = left.span.start.clone();
                     let end_location = end_token.span.end;
@@ -382,9 +378,9 @@ fn parse_path_expression(stream: &mut ParsingStream<Token>) -> Result<Expression
 fn parse_parenthesised_expression(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Expression, ParsingError> {
-    expect_token!(stream.next(), TokenType::ParenOpen);
+    expect_token!(&stream.next(), [ParenOpen]);
     let expression = parse_expression_binding_power(stream, 0)?;
-    expect_token!(stream.next(), TokenType::ParenClose);
+    expect_token!(&stream.next(), [ParenClose]);
     Ok(expression)
 }
 
@@ -416,26 +412,27 @@ fn parse_unary_operation(stream: &mut ParsingStream<Token>) -> Result<Expression
 fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Expression, ParsingError> {
     let token = stream.next();
     let span = token.span.clone();
-    let kind = match &token.token_type {
-        TokenType::Boolean(value) => ExpressionKind::Literal(Literal {
+
+    expect_token!(&token, [Boolean, Int, Float, String]);
+
+    let kind = match &token.token_data {
+        TokenData::Boolean(value) => ExpressionKind::Literal(Literal {
             kind: LiteralKind::Boolean(*value),
             span: token.span,
         }),
-        TokenType::Int(value) => ExpressionKind::Literal(Literal {
+        TokenData::Int(value) => ExpressionKind::Literal(Literal {
             kind: LiteralKind::Int(*value),
             span: token.span,
         }),
-        TokenType::Float(value) => ExpressionKind::Literal(Literal {
+        TokenData::Float(value) => ExpressionKind::Literal(Literal {
             kind: LiteralKind::Float(*value),
             span: token.span,
         }),
-        TokenType::String(value) => ExpressionKind::Literal(Literal {
+        TokenData::String(value) => ExpressionKind::Literal(Literal {
             kind: LiteralKind::String(value.to_owned()),
             span: token.span,
         }),
-        _ => {
-            unexpected_token!(token);
-        }
+        _ => unreachable!(),
     };
 
     Ok(Expression { kind, span })
@@ -448,7 +445,7 @@ mod tests {
             ast::TypeKind,
             path::{Path, PathSegment},
             statement::{StatementKind, VariableDeclaration, VariableDeclarationKind},
-            tests::assert_parsing_result,
+            tests::{assert_parsing_result, make_token},
         },
         span::Span,
     };
@@ -459,7 +456,10 @@ mod tests {
     fn test_parse_literal_expression() {
         //  "hello"
         assert_parsing_result(
-            vec![TokenType::String(String::from("hello"))],
+            vec![make_token(
+                TokenType::String,
+                TokenData::String(String::from("hello")),
+            )],
             parse_expression,
             Ok(Expression {
                 kind: ExpressionKind::Literal(Literal {
@@ -472,7 +472,7 @@ mod tests {
 
         // 12
         assert_parsing_result(
-            vec![TokenType::Int(12)],
+            vec![make_token(TokenType::Int, TokenData::Int(12))],
             parse_expression,
             Ok(Expression {
                 kind: ExpressionKind::Literal(Literal {
@@ -485,7 +485,7 @@ mod tests {
 
         // 47.2821
         assert_parsing_result(
-            vec![TokenType::Float(47.2821)],
+            vec![make_token(TokenType::Float, TokenData::Float(47.2821))],
             parse_expression,
             Ok(Expression {
                 kind: ExpressionKind::Literal(Literal {
@@ -498,7 +498,7 @@ mod tests {
 
         // true
         assert_parsing_result(
-            vec![TokenType::Boolean(true)],
+            vec![make_token(TokenType::Boolean, TokenData::Boolean(true))],
             parse_expression,
             Ok(Expression {
                 kind: ExpressionKind::Literal(Literal {
@@ -511,7 +511,7 @@ mod tests {
 
         // false
         assert_parsing_result(
-            vec![TokenType::Boolean(false)],
+            vec![make_token(TokenType::Boolean, TokenData::Boolean(false))],
             parse_expression,
             Ok(Expression {
                 kind: ExpressionKind::Literal(Literal {
@@ -527,12 +527,12 @@ mod tests {
     fn test_parse_simple_binary_op() {
         assert_parsing_result(
             vec![
-                TokenType::Int(1),
-                TokenType::Plus,
-                TokenType::Int(2),
-                TokenType::Multiply,
-                TokenType::Int(3),
-                TokenType::EOF,
+                make_token(TokenType::Int, TokenData::Int(1)),
+                make_token(TokenType::Plus, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(2)),
+                make_token(TokenType::Multiply, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(3)),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -575,22 +575,34 @@ mod tests {
     fn test_parse_simple_function() {
         assert_parsing_result(
             vec![
-                TokenType::Function,
-                TokenType::ParenOpen,
-                TokenType::Identifier("hello".to_string()),
-                TokenType::Comma,
-                TokenType::Identifier("world".to_string()),
-                TokenType::Colon,
-                TokenType::Identifier("string".to_string()),
-                TokenType::ParenClose,
-                TokenType::CurlyBracketOpen,
-                TokenType::Let,
-                TokenType::Identifier("a".to_string()),
-                TokenType::Eq,
-                TokenType::Int(10),
-                TokenType::SemiConlon,
-                TokenType::CurlyBracketClose,
-                TokenType::EOF,
+                make_token(TokenType::Function, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("hello".to_string()),
+                ),
+                make_token(TokenType::Comma, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("world".to_string()),
+                ),
+                make_token(TokenType::Colon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("string".to_string()),
+                ),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::CurlyBracketOpen, TokenData::None),
+                make_token(TokenType::Let, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("a".to_string()),
+                ),
+                make_token(TokenType::Eq, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(10)),
+                make_token(TokenType::SemiConlon, TokenData::None),
+                make_token(TokenType::CurlyBracketClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -658,17 +670,26 @@ mod tests {
     fn test_parse_empty_body_function() {
         assert_parsing_result(
             vec![
-                TokenType::Function,
-                TokenType::ParenOpen,
-                TokenType::Identifier("hello".to_string()),
-                TokenType::Comma,
-                TokenType::Identifier("world".to_string()),
-                TokenType::Colon,
-                TokenType::Identifier("string".to_string()),
-                TokenType::ParenClose,
-                TokenType::CurlyBracketOpen,
-                TokenType::CurlyBracketClose,
-                TokenType::EOF,
+                make_token(TokenType::Function, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("hello".to_string()),
+                ),
+                make_token(TokenType::Comma, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("world".to_string()),
+                ),
+                make_token(TokenType::Colon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("string".to_string()),
+                ),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::CurlyBracketOpen, TokenData::None),
+                make_token(TokenType::CurlyBracketClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -716,12 +737,12 @@ mod tests {
     fn test_parse_empty_arg_function() {
         assert_parsing_result(
             vec![
-                TokenType::Function,
-                TokenType::ParenOpen,
-                TokenType::ParenClose,
-                TokenType::CurlyBracketOpen,
-                TokenType::CurlyBracketClose,
-                TokenType::EOF,
+                make_token(TokenType::Function, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::CurlyBracketOpen, TokenData::None),
+                make_token(TokenType::CurlyBracketClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -741,14 +762,17 @@ mod tests {
     fn test_parse_return_type_function() {
         assert_parsing_result(
             vec![
-                TokenType::Function,
-                TokenType::ParenOpen,
-                TokenType::ParenClose,
-                TokenType::ThinArrow,
-                TokenType::Identifier("number".to_string()),
-                TokenType::CurlyBracketOpen,
-                TokenType::CurlyBracketClose,
-                TokenType::EOF,
+                make_token(TokenType::Function, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::ThinArrow, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("number".to_string()),
+                ),
+                make_token(TokenType::CurlyBracketOpen, TokenData::None),
+                make_token(TokenType::CurlyBracketClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -777,14 +801,23 @@ mod tests {
     fn test_path_in_binary_op() {
         assert_parsing_result(
             vec![
-                TokenType::Identifier("a".to_string()),
-                TokenType::Plus,
-                TokenType::Identifier("module".to_string()),
-                TokenType::ColonColon,
-                TokenType::Identifier("b".to_string()),
-                TokenType::Multiply,
-                TokenType::Int(3),
-                TokenType::EOF,
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("a".to_string()),
+                ),
+                make_token(TokenType::Plus, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("module".to_string()),
+                ),
+                make_token(TokenType::ColonColon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("b".to_string()),
+                ),
+                make_token(TokenType::Multiply, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(3)),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -848,11 +881,11 @@ mod tests {
     fn test_unary_op() {
         assert_parsing_result(
             vec![
-                TokenType::Int(5),
-                TokenType::Plus,
-                TokenType::Minus,
-                TokenType::Int(5),
-                TokenType::EOF,
+                make_token(TokenType::Int, TokenData::Int(5)),
+                make_token(TokenType::Plus, TokenData::None),
+                make_token(TokenType::Minus, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(5)),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -888,14 +921,14 @@ mod tests {
     fn test_parenthesised_expression() {
         assert_parsing_result(
             vec![
-                TokenType::ParenOpen,
-                TokenType::Int(5),
-                TokenType::Minus,
-                TokenType::Int(1),
-                TokenType::ParenClose,
-                TokenType::Multiply,
-                TokenType::Int(4),
-                TokenType::EOF,
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(5)),
+                make_token(TokenType::Minus, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(1)),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::Multiply, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(4)),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -938,14 +971,14 @@ mod tests {
     fn test_multiple_parenthesised_expression() {
         assert_parsing_result(
             vec![
-                TokenType::ParenOpen,
-                TokenType::ParenOpen,
-                TokenType::ParenOpen,
-                TokenType::Int(5),
-                TokenType::ParenClose,
-                TokenType::ParenClose,
-                TokenType::ParenClose,
-                TokenType::EOF,
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(TokenType::Int, TokenData::Int(5)),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {
@@ -962,17 +995,32 @@ mod tests {
     fn test_function_call_expression() {
         assert_parsing_result(
             vec![
-                TokenType::Identifier(String::from("a")),
-                TokenType::Period,
-                TokenType::Identifier(String::from("b")),
-                TokenType::Period,
-                TokenType::Identifier(String::from("c")),
-                TokenType::ParenOpen,
-                TokenType::Identifier(String::from("d")),
-                TokenType::Comma,
-                TokenType::Identifier(String::from("f")),
-                TokenType::ParenClose,
-                TokenType::EOF,
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("a")),
+                ),
+                make_token(TokenType::Period, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("b")),
+                ),
+                make_token(TokenType::Period, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("c")),
+                ),
+                make_token(TokenType::ParenOpen, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("d")),
+                ),
+                make_token(TokenType::Comma, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier(String::from("f")),
+                ),
+                make_token(TokenType::ParenClose, TokenData::None),
+                make_token(TokenType::EOF, TokenData::None),
             ],
             parse_expression,
             Ok(Expression {

@@ -1,5 +1,5 @@
 use crate::{
-    lexer::{Token, TokenType},
+    lexer::{Token, TokenData, TokenType},
     stream::ParsingStream,
 };
 
@@ -10,10 +10,10 @@ use super::{ast::Identifier, expect_token, ParsingError};
 pub fn parse_identifier(stream: &mut ParsingStream<Token>) -> Result<Identifier, ParsingError> {
     let token = stream.next();
 
-    expect_token!(token, TokenType::Identifier(_));
+    expect_token!(&token, [Identifier]);
 
-    match token.token_type {
-        TokenType::Identifier(ident) => Ok(Identifier {
+    match token.token_data {
+        TokenData::Identifier(ident) => Ok(Identifier {
             name: ident.clone(),
             span: token.span,
         }),

@@ -7,6 +7,7 @@ mod statement;
 use std::fmt::Debug;
 
 use crate::{
+    lexer::TokenData,
     span::Span,
     stream::{peek, ParsingStream},
 };
@@ -17,41 +18,77 @@ use super::lexer::{Token, TokenType};
 
 #[derive(PartialEq)]
 pub enum ParsingError {
-    UnexpectedToken(Token),
+    UnexpectedToken {
+        expected_token_types: Vec<TokenType>,
+        found_token: Token,
+    },
 }
 
 impl Debug for ParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParsingError::UnexpectedToken(token) => {
-                write!(f, "Unexpected token encountered: {:#?}", token)
+            ParsingError::UnexpectedToken {
+                expected_token_types,
+                found_token,
+            } => {
+                write!(
+                    f,
+                    "Expected token types {}, but found: {:?}",
+                    expected_token_types
+                        .iter()
+                        .map(|token_type| format!("{:?}", token_type))
+                        .collect::<Vec<String>>()
+                        .join(" or "),
+                    found_token
+                )
             }
         }
     }
 }
 
 macro_rules! expect_token {
-    ($x:expr, $y:pat) => {
-        match &$x.token_type {
-            $y => {}
-            _ => {
-                super::unexpected_token!($x);
-            }
+    ($token:expr, [$($token_type:ident),*]) => {
+        match $token.token_type {
+            $(
+                TokenType::$token_type => {}
+            ),*,
+            _ => return Err(ParsingError::UnexpectedToken {
+                found_token: $token.clone(),
+                expected_token_types: vec![$(TokenType::$token_type),*],
+            })
         }
     };
 }
 
-macro_rules! unexpected_token {
-    ($x:expr) => {
-        if !cfg!(test) && cfg!(debug_assertions) {
-            panic!("Unexpected Token: {:#?}", $x);
+macro_rules! match_token {
+    ($token:expr, {$($($token_type:ident)|* => $block:block),*}) => {
+        match $token.token_type {
+            $(
+                $(TokenType::$token_type)|* => $block
+            ),*,
+            _ => return Err(ParsingError::UnexpectedToken {
+                found_token: $token.clone(),
+                expected_token_types: vec![$($(TokenType::$token_type),*),*],
+            })
         }
-        return Err(ParsingError::UnexpectedToken($x.clone()));
     };
+    ($token:expr, {$($($token_type:ident)|* => $expr:expr),*}) => {
+        match $token.token_type {
+            $(
+                $(TokenType::$token_type)|* => {
+                    $expr
+                }
+            ),*,
+            _ => return Err(ParsingError::UnexpectedToken {
+                found_token: $token.clone(),
+                expected_token_types: vec![$($(TokenType::$token_type),*),*],
+            })
+        }
+    }
 }
 
 pub(crate) use expect_token;
-pub(crate) use unexpected_token;
+pub(crate) use match_token;
 
 pub struct Parser {
     pub program: Program,
@@ -79,6 +116,7 @@ impl Parser {
             &mut tokens_iter,
             Token {
                 token_type: TokenType::EOF,
+                token_data: TokenData::None,
                 span: last_span,
             },
         );
@@ -104,26 +142,28 @@ impl Parser {
 mod tests {
     use super::*;
 
+    pub fn make_token(token_type: TokenType, data: TokenData) -> Token {
+        Token {
+            token_type,
+            token_data: data,
+            span: Span::from(((0, 0), (0, 0))),
+        }
+    }
+
     pub fn assert_parsing_result<T, F>(
-        token_types: Vec<TokenType>,
+        tokens: Vec<Token>,
         parsing_fn: F,
         expected: Result<T, ParsingError>,
     ) where
         F: Fn(&mut ParsingStream<Token>) -> Result<T, ParsingError>,
         T: PartialEq + Debug,
     {
-        let tokens = token_types
-            .into_iter()
-            .map(|token_type| Token {
-                token_type,
-                span: Span::from(((0, 0), (0, 0))),
-            })
-            .collect::<Vec<Token>>();
         let mut iter = tokens.clone().into_iter();
         let mut stream = ParsingStream::new(
             &mut iter,
             Token {
                 token_type: TokenType::EOF,
+                token_data: TokenData::None,
                 span: Span::from(((0, 0), (0, 0))),
             },
         );
@@ -134,6 +174,7 @@ mod tests {
     fn test_parse_empty_program() {
         let tokens = vec![Token {
             token_type: TokenType::EOF,
+            token_data: TokenData::None,
             span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
         }];
         let ast = Parser::parse(tokens).expect("Failed to parse tokens");

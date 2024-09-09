@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::{
-    lexer::{Token, TokenType},
-    parser::{ast::TypeKind, basics, expect_token, expression, path, unexpected_token},
+    lexer::{Token, TokenData, TokenType},
+    parser::{ast::TypeKind, basics, expect_token, expression, path},
     stream::{peek, ParsingStream},
 };
 
@@ -51,7 +51,7 @@ pub fn parse_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, P
     match peek!(stream).token_type {
         TokenType::Let => parse_let_statement(stream),
         TokenType::Return => parse_return_statement(stream),
-        TokenType::Identifier(_) if peek!(stream, 2).token_type == TokenType::Eq => {
+        TokenType::Identifier if peek!(stream, 2).token_type == TokenType::Eq => {
             parse_assignment_statement(stream)
         }
         _ => parse_expression_statement(stream),
@@ -64,9 +64,9 @@ fn parse_assignment_statement(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Statement, ParsingError> {
     let identifier = basics::parse_identifier(stream)?;
-    expect_token!(stream.next(), TokenType::Eq);
+    expect_token!(&stream.next(), [Eq]);
     let expression = expression::parse_expression(stream)?;
-    expect_token!(stream.next(), TokenType::SemiConlon);
+    expect_token!(&stream.next(), [SemiConlon]);
     Ok(Statement {
         kind: StatementKind::Assignment(Assignment {
             identifier,
@@ -81,7 +81,7 @@ fn parse_expression_statement(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Statement, ParsingError> {
     let expression = expression::parse_expression(stream)?;
-    expect_token!(stream.next(), TokenType::SemiConlon);
+    expect_token!(&stream.next(), [SemiConlon]);
     Ok(Statement {
         kind: StatementKind::Expr(expression),
     })
@@ -90,9 +90,9 @@ fn parse_expression_statement(
 /// Parse an ReturnStatement with syntax:
 /// ReturnStatement = <Return> + <Expression> + ;
 fn parse_return_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
-    expect_token!(stream.next(), TokenType::Return);
+    expect_token!(&stream.next(), [Return]);
     let expression = expression::parse_expression(stream)?;
-    expect_token!(stream.next(), TokenType::SemiConlon);
+    expect_token!(&stream.next(), [SemiConlon]);
     Ok(Statement {
         kind: StatementKind::Return(expression),
     })
@@ -102,7 +102,7 @@ fn parse_return_statement(stream: &mut ParsingStream<Token>) -> Result<Statement
 /// LetStatement = <VariableDeclaration> + ;
 fn parse_let_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
     let variable_declaration = parse_variable_declaration(stream)?;
-    expect_token!(stream.next(), TokenType::SemiConlon);
+    expect_token!(&stream.next(), [SemiConlon]);
     Ok(Statement {
         kind: StatementKind::Let(variable_declaration),
     })
@@ -114,7 +114,7 @@ fn parse_variable_declaration(
     stream: &mut ParsingStream<Token>,
 ) -> Result<VariableDeclaration, ParsingError> {
     // Variable declaration start with keyword let
-    expect_token!(stream.next(), TokenType::Let);
+    expect_token!(&stream.next(), [Let]);
 
     let variable_name;
     let variable_name_token_span;
@@ -122,17 +122,18 @@ fn parse_variable_declaration(
 
     loop {
         let token = stream.next();
-        match &token.token_type {
-            TokenType::Mut => {
-                is_mutable = true;
-            }
-            TokenType::Identifier(identifier) => {
+
+        expect_token!(&token, [Mut, Identifier]);
+
+        match &token.token_data {
+            TokenData::Identifier(identifier) => {
                 variable_name = identifier.clone();
                 variable_name_token_span = token.span;
                 break;
             }
+            // This can only be TokenType::Mut (due to verification before)
             _ => {
-                unexpected_token!(token);
+                is_mutable = true;
             }
         }
     }
@@ -163,6 +164,9 @@ fn parse_variable_declaration(
 /// Parsing a type
 pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, ParsingError> {
     let token = peek!(stream);
+
+    expect_token!(&token, [Colon, Eq, SemiConlon, Comma]);
+
     let variable_type = match token.token_type {
         TokenType::Colon => {
             stream.next(); // Consume Colon
@@ -174,9 +178,7 @@ pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, Pars
         TokenType::Eq | TokenType::SemiConlon | TokenType::Comma => Type {
             kind: TypeKind::Infer,
         },
-        _ => {
-            unexpected_token!(token);
-        }
+        _ => unreachable!(),
     };
 
     Ok(variable_type)
@@ -188,7 +190,7 @@ mod tests {
     use crate::{
         parser::{
             ast::{Expression, ExpressionKind, Literal, LiteralKind, Path, PathSegment},
-            tests::assert_parsing_result,
+            tests::{assert_parsing_result, make_token},
         },
         span::Span,
     };
@@ -197,20 +199,30 @@ mod tests {
     fn test_parse_statement_missing_semicolon() {
         // let mut hello: string
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Mut,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::Colon,
-            TokenType::Identifier(String::from("string")),
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(TokenType::Mut, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::Colon, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("string")),
+            ),
+            make_token(TokenType::EOF, TokenData::None),
         ];
         assert_parsing_result(
             tokens,
             parse_statement,
-            Err(ParsingError::UnexpectedToken(Token {
-                token_type: TokenType::EOF,
-                span: Span::from(((0, 0), (0, 0))),
-            })),
+            Err(ParsingError::UnexpectedToken {
+                expected_token_types: vec![TokenType::SemiConlon],
+                found_token: Token {
+                    token_type: TokenType::EOF,
+                    token_data: TokenData::None,
+                    span: Span::from(((0, 0), (0, 0))),
+                },
+            }),
         );
     }
 
@@ -218,12 +230,18 @@ mod tests {
     fn test_parse_variable_declaration_immutable() {
         // let hello: string;
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::Colon,
-            TokenType::Identifier(String::from("string")),
-            TokenType::SemiConlon,
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::Colon, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("string")),
+            ),
+            make_token(TokenType::SemiConlon, TokenData::None),
+            make_token(TokenType::EOF, TokenData::None),
         ];
         let expected = Statement {
             kind: StatementKind::Let(VariableDeclaration {
@@ -254,13 +272,19 @@ mod tests {
     fn test_parse_variable_declaration() {
         // let mut hello: string;
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Mut,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::Colon,
-            TokenType::Identifier(String::from("string")),
-            TokenType::SemiConlon,
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(TokenType::Mut, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::Colon, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("string")),
+            ),
+            make_token(TokenType::SemiConlon, TokenData::None),
+            make_token(TokenType::EOF, TokenData::None),
         ];
         let expected = Statement {
             kind: StatementKind::Let(VariableDeclaration {
@@ -291,11 +315,14 @@ mod tests {
     fn test_parse_variable_declaration_infer_type() {
         // let mut hello: string;
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Mut,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::SemiConlon,
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(TokenType::Mut, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::SemiConlon, TokenData::None),
+            make_token(TokenType::EOF, TokenData::None),
         ];
         let expected = Statement {
             kind: StatementKind::Let(VariableDeclaration {
@@ -317,15 +344,21 @@ mod tests {
     fn test_parse_variable_initialization() {
         // let mut hello: string = "hello";
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Mut,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::Colon,
-            TokenType::Identifier(String::from("string")),
-            TokenType::Eq,
-            TokenType::String(String::from("hello")),
-            TokenType::SemiConlon,
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(TokenType::Mut, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::Colon, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("string")),
+            ),
+            make_token(TokenType::Eq, TokenData::None),
+            make_token(TokenType::String, TokenData::String(String::from("hello"))),
+            make_token(TokenType::SemiConlon, TokenData::None),
+            make_token(TokenType::EOF, TokenData::None),
         ];
         let expected = Statement {
             kind: StatementKind::Let(VariableDeclaration {
@@ -362,13 +395,16 @@ mod tests {
     fn test_parse_variable_initialization_infer_type() {
         // let mut hello = "hello";
         let tokens = vec![
-            TokenType::Let,
-            TokenType::Mut,
-            TokenType::Identifier(String::from("hello")),
-            TokenType::Eq,
-            TokenType::String(String::from("hello")),
-            TokenType::SemiConlon,
-            TokenType::EOF,
+            make_token(TokenType::Let, TokenData::None),
+            make_token(TokenType::Mut, TokenData::None),
+            make_token(
+                TokenType::Identifier,
+                TokenData::Identifier(String::from("hello")),
+            ),
+            make_token(TokenType::Eq, TokenData::None),
+            make_token(TokenType::String, TokenData::String(String::from("hello"))),
+            make_token(TokenType::SemiConlon, TokenData::None),
+            make_token(TokenType::EOF, TokenData::None),
         ];
 
         let expected = Statement {
