@@ -8,41 +8,83 @@ use std::fmt::Debug;
 
 use crate::{
     lexer::TokenData,
-    span::Span,
     stream::{peek, ParsingStream},
 };
 
 use self::ast::{Item, ItemKind, Program};
 
 use super::lexer::{Token, TokenType};
+use codespan::Span;
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Label},
+    files::SimpleFiles,
+};
 
-#[derive(PartialEq)]
-pub enum ParsingError {
-    UnexpectedToken {
-        expected_token_types: Vec<TokenType>,
-        found_token: Token,
-    },
+#[derive(PartialEq, Clone)]
+pub enum ParsingErrorType {
+    UnexpectedToken(Token),
+}
+
+pub struct ParsingError {
+    files: SimpleFiles<String, String>,
+    diagnostic: Diagnostic<usize>,
+    error_type: ParsingErrorType,
+}
+
+impl PartialEq for ParsingError {
+    fn eq(&self, other: &Self) -> bool {
+        self.error_type == other.error_type
+    }
 }
 
 impl Debug for ParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParsingError::UnexpectedToken {
-                expected_token_types,
-                found_token,
-            } => {
-                write!(
-                    f,
-                    "Expected token types {}, but found: {:?}",
-                    expected_token_types
-                        .iter()
-                        .map(|token_type| format!("{:?}", token_type))
-                        .collect::<Vec<String>>()
-                        .join(" or "),
-                    found_token
-                )
-            }
+        self.diagnostic.fmt(f)
+    }
+}
+
+impl ParsingError {
+    pub fn diagnostic(&self) -> &Diagnostic<usize> {
+        &self.diagnostic
+    }
+
+    pub fn error_type(&self) -> &ParsingErrorType {
+        &self.error_type
+    }
+
+    pub fn files(&self) -> &SimpleFiles<String, String> {
+        &self.files
+    }
+
+    pub fn unexpected_token(found_token: &Token, expected_token_types: Vec<TokenType>) -> Self {
+        let mut notes = String::from("Expected ");
+
+        notes.push_str(
+            &expected_token_types
+                .iter()
+                .map(|token| format!("{:?}", token))
+                .collect::<Vec<String>>()
+                .join(" or "),
+        );
+
+        let diagnostic = Diagnostic::error()
+            .with_code("E01")
+            .with_message(format!("Unexpected token {:?}", found_token.token_type))
+            .with_notes(vec![notes]);
+
+        Self {
+            error_type: ParsingErrorType::UnexpectedToken(found_token.clone()),
+            files: SimpleFiles::new(),
+            diagnostic,
         }
+    }
+
+    pub fn add_file(mut self, name: String, source: String, range: Span) -> Self {
+        let file_id = self.files.add(name, source);
+        self.diagnostic = self
+            .diagnostic
+            .with_labels(vec![Label::primary(file_id, range)]);
+        self
     }
 }
 
@@ -52,10 +94,7 @@ macro_rules! expect_token {
             $(
                 TokenType::$token_type => {}
             ),*,
-            _ => return Err(ParsingError::UnexpectedToken {
-                found_token: $token.clone(),
-                expected_token_types: vec![$(TokenType::$token_type),*],
-            })
+            _ => return Err(ParsingError::unexpected_token(&$token, vec![$(TokenType::$token_type),*]))
         }
     };
 }
@@ -66,10 +105,7 @@ macro_rules! match_token {
             $(
                 $(TokenType::$token_type)|* => $block
             ),*,
-            _ => return Err(ParsingError::UnexpectedToken {
-                found_token: $token.clone(),
-                expected_token_types: vec![$($(TokenType::$token_type),*),*],
-            })
+            _ => return Err(ParsingError::unexpected_token(&$token, vec![$($(TokenType::$token_type),*),*]))
         }
     };
     ($token:expr, {$($($token_type:ident)|* => $expr:expr),*}) => {
@@ -79,10 +115,7 @@ macro_rules! match_token {
                     $expr
                 }
             ),*,
-            _ => return Err(ParsingError::UnexpectedToken {
-                found_token: $token.clone(),
-                expected_token_types: vec![$($(TokenType::$token_type),*),*],
-            })
+            _ => return Err(ParsingError::unexpected_token(&$token, vec![$($(TokenType::$token_type),*),*]))
         }
     }
 }
@@ -108,7 +141,7 @@ impl Parser {
             .last()
             .cloned()
             .map(|token| token.span)
-            .unwrap_or(Span::from(((1, 0), (1, 1))));
+            .unwrap_or(Span::new(0, 1));
 
         let mut tokens_iter = tokens.into_iter();
 
@@ -146,7 +179,7 @@ mod tests {
         Token {
             token_type,
             token_data: data,
-            span: Span::from(((0, 0), (0, 0))),
+            span: Span::default(),
         }
     }
 
@@ -164,7 +197,7 @@ mod tests {
             Token {
                 token_type: TokenType::EOF,
                 token_data: TokenData::None,
-                span: Span::from(((0, 0), (0, 0))),
+                span: Span::default(),
             },
         );
         assert_eq!(parsing_fn(&mut stream), expected)
@@ -175,7 +208,7 @@ mod tests {
         let tokens = vec![Token {
             token_type: TokenType::EOF,
             token_data: TokenData::None,
-            span: Span::from(((0, 0), (0, 0))), // random span cus we don't care
+            span: Span::default(),
         }];
         let ast = Parser::parse(tokens).expect("Failed to parse tokens");
         let expected = Program { items: Vec::new() };

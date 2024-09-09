@@ -1,9 +1,9 @@
+use codespan::Span;
 use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenData, TokenType},
     parser::{ast::TypeKind, match_token, statement::parse_statement},
-    span::Span,
     stream::{peek, ParsingStream},
 };
 
@@ -117,7 +117,7 @@ fn parse_function_declaration(
     let start_token = stream.next();
     expect_token!(&start_token, [Function]);
 
-    let start_location = start_token.span.start;
+    let start_location = start_token.span.start();
 
     expect_token!(&stream.next(), [ParenOpen]);
 
@@ -152,7 +152,7 @@ fn parse_function_declaration(
 
     let body = parse_block(stream)?;
 
-    let end_location = stream.current().clone().unwrap().span.end;
+    let end_location = stream.current().clone().unwrap().span.end();
 
     Ok(Expression {
         kind: ExpressionKind::Function(Function {
@@ -160,10 +160,7 @@ fn parse_function_declaration(
             body,
             return_type,
         }),
-        span: Span {
-            start: start_location,
-            end: end_location,
-        },
+        span: Span::new(start_location, end_location),
     })
 }
 
@@ -257,18 +254,15 @@ fn parse_expression_binding_power(
                     let end_token = stream.next();
                     expect_token!(&end_token, [ParenClose]);
 
-                    let start_location = left.span.start.clone();
-                    let end_location = end_token.span.end;
+                    let start_location = left.span.start();
+                    let end_location = end_token.span.end();
 
                     Expression {
                         kind: ExpressionKind::Call(Call {
                             function: Box::new(left),
                             args,
                         }),
-                        span: Span {
-                            start: start_location,
-                            end: end_location,
-                        },
+                        span: Span::new(start_location, end_location),
                     }
                 }
                 _ => unreachable!("Invalid operator"),
@@ -288,34 +282,28 @@ fn parse_expression_binding_power(
         left = match op {
             Operator::MemberAccess => {
                 let member = parse_identifier(stream)?;
-                let start_location = left.span.start.clone();
-                let end_location = member.span.end.clone();
+                let start_location = left.span.start();
+                let end_location = member.span.end();
 
                 Expression {
                     kind: ExpressionKind::MemberAccess(MemberAccess {
                         object: Box::new(left),
                         member,
                     }),
-                    span: Span {
-                        start: start_location,
-                        end: end_location,
-                    },
+                    span: Span::new(start_location, end_location),
                 }
             }
             _ => {
                 let right = parse_expression_binding_power(stream, right_binding_power)?;
-                let start_location = left.span.start.clone();
-                let end_location = right.span.end.clone();
+                let start_location = left.span.start();
+                let end_location = right.span.end();
                 Expression {
                     kind: ExpressionKind::BinaryOp(BinaryOp {
                         left: Box::new(left),
                         right: Box::new(right),
                         op,
                     }),
-                    span: Span {
-                        start: start_location,
-                        end: end_location,
-                    },
+                    span: Span::new(start_location, end_location),
                 }
             }
         }
@@ -392,18 +380,15 @@ fn parse_unary_operation(stream: &mut ParsingStream<Token>) -> Result<Expression
     let ((), right_binding_power) = prefix_binding_power(&op);
     let right = parse_expression_binding_power(stream, right_binding_power)?;
 
-    let start_location = token.span.start;
-    let end_location = right.span.end.clone();
+    let start_location = token.span.start();
+    let end_location = right.span.end();
 
     Ok(Expression {
         kind: ExpressionKind::UnaryOp(UnaryOp {
             op,
             expression: Box::new(right),
         }),
-        span: Span {
-            start: start_location,
-            end: end_location,
-        },
+        span: Span::new(start_location, end_location),
     })
 }
 
@@ -440,14 +425,11 @@ fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Express
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        parser::{
-            ast::TypeKind,
-            path::{Path, PathSegment},
-            statement::{StatementKind, VariableDeclaration, VariableDeclarationKind},
-            tests::{assert_parsing_result, make_token},
-        },
-        span::Span,
+    use crate::parser::{
+        ast::TypeKind,
+        path::{Path, PathSegment},
+        statement::{StatementKind, VariableDeclaration, VariableDeclarationKind},
+        tests::{assert_parsing_result, make_token},
     };
 
     use super::*;

@@ -1,4 +1,4 @@
-use crate::span::Span;
+use codespan::Span;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {

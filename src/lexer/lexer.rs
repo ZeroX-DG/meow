@@ -1,9 +1,7 @@
-use crate::{
-    span::{LineColumn, Span},
-    stream::{peek, ParsingStream},
-};
+use codespan::Span;
 
 use super::token::{Token, TokenData, TokenType};
+use crate::stream::{peek, ParsingStream};
 
 macro_rules! peek_next {
     ($stream:ident, $x:expr) => {
@@ -20,16 +18,14 @@ pub enum LexingError {
 
 pub struct Lexer {
     tokens: Vec<Token>,
-    line: usize,
-    column: usize,
+    byte_index: usize,
 }
 
 impl Lexer {
     fn new() -> Self {
         Self {
             tokens: Vec::new(),
-            line: 1,
-            column: 0,
+            byte_index: 0,
         }
     }
 
@@ -42,11 +38,7 @@ impl Lexer {
             let ch = stream.next();
             match ch {
                 ch if ch.is_whitespace() => {
-                    if ch == '\n' {
-                        lexer.line += 1;
-                    } else {
-                        lexer.column += 1;
-                    }
+                    lexer.byte_index += ch.len_utf8();
                     continue;
                 }
                 '(' => lexer.push_token(lexer.char_span(), TokenType::ParenOpen, TokenData::None),
@@ -75,58 +67,57 @@ impl Lexer {
                     // Comments
                     // Ignore for now.
                     stream.consume_until(|c| {
-                        lexer.column += 1;
+                        lexer.byte_index += c.len_utf8();
                         *c == '\n'
                     });
-                    lexer.line += 1;
                 }
                 '/' => lexer.push_token(lexer.char_span(), TokenType::Divide, TokenData::None),
                 '*' => lexer.push_token(lexer.char_span(), TokenType::Multiply, TokenData::None),
                 '+' => lexer.push_token(lexer.char_span(), TokenType::Plus, TokenData::None),
                 '-' if peek_next!(stream, '>') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::ThinArrow, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::ThinArrow, TokenData::None);
                     stream.next();
                 }
                 '-' => lexer.push_token(lexer.char_span(), TokenType::Minus, TokenData::None),
                 '%' => lexer.push_token(lexer.char_span(), TokenType::Mod, TokenData::None),
                 '|' if peek_next!(stream, '|') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::OrOr, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::OrOr, TokenData::None);
                     stream.next();
                 }
                 '|' => lexer.push_token(lexer.char_span(), TokenType::Or, TokenData::None),
                 '&' if peek_next!(stream, '&') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::AndAnd, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::AndAnd, TokenData::None);
                     stream.next();
                 }
                 '&' => lexer.push_token(lexer.char_span(), TokenType::And, TokenData::None),
                 '!' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::NotEq, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::NotEq, TokenData::None);
                     stream.next();
                 }
                 '!' => lexer.push_token(lexer.char_span(), TokenType::Not, TokenData::None),
                 '=' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::EqEq, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::EqEq, TokenData::None);
                     stream.next();
                 }
                 '=' if peek_next!(stream, '>') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::FatArrow, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::FatArrow, TokenData::None);
                     stream.next();
                 }
                 '=' => lexer.push_token(lexer.char_span(), TokenType::Eq, TokenData::None),
                 '>' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::GreaterEq, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::GreaterEq, TokenData::None);
                     stream.next();
                 }
                 '>' => lexer.push_token(lexer.char_span(), TokenType::GreaterThan, TokenData::None),
                 '<' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::LessEq, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::LessEq, TokenData::None);
                     stream.next();
                 }
                 '<' => lexer.push_token(lexer.char_span(), TokenType::LessThan, TokenData::None),
                 ',' => lexer.push_token(lexer.char_span(), TokenType::Comma, TokenData::None),
                 '.' => lexer.push_token(lexer.char_span(), TokenType::Period, TokenData::None),
                 ':' if peek_next!(stream, ':') => {
-                    lexer.push_token(lexer.line_span(2), TokenType::ColonColon, TokenData::None);
+                    lexer.push_token(lexer.new_span(2), TokenType::ColonColon, TokenData::None);
                     stream.next();
                 }
                 ':' => lexer.push_token(lexer.char_span(), TokenType::Colon, TokenData::None),
@@ -144,33 +135,33 @@ impl Lexer {
                     }
 
                     if content == "fn" {
-                        lexer.push_token(lexer.line_span(2), TokenType::Function, TokenData::None);
+                        lexer.push_token(lexer.new_span(2), TokenType::Function, TokenData::None);
                         continue;
                     }
 
                     if content == "class" {
-                        lexer.push_token(lexer.line_span(5), TokenType::Class, TokenData::None);
+                        lexer.push_token(lexer.new_span(5), TokenType::Class, TokenData::None);
                         continue;
                     }
 
                     if content == "let" {
-                        lexer.push_token(lexer.line_span(3), TokenType::Let, TokenData::None);
+                        lexer.push_token(lexer.new_span(3), TokenType::Let, TokenData::None);
                         continue;
                     }
 
                     if content == "mut" {
-                        lexer.push_token(lexer.line_span(3), TokenType::Mut, TokenData::None);
+                        lexer.push_token(lexer.new_span(3), TokenType::Mut, TokenData::None);
                         continue;
                     }
 
                     if content == "return" {
-                        lexer.push_token(lexer.line_span(6), TokenType::Return, TokenData::None);
+                        lexer.push_token(lexer.new_span(6), TokenType::Return, TokenData::None);
                         continue;
                     }
 
                     if content == "true" {
                         lexer.push_token(
-                            lexer.line_span(4),
+                            lexer.new_span(4),
                             TokenType::Boolean,
                             TokenData::Boolean(true),
                         );
@@ -179,7 +170,7 @@ impl Lexer {
 
                     if content == "false" {
                         lexer.push_token(
-                            lexer.line_span(5),
+                            lexer.new_span(5),
                             TokenType::Boolean,
                             TokenData::Boolean(false),
                         );
@@ -187,7 +178,7 @@ impl Lexer {
                     }
 
                     lexer.push_token(
-                        lexer.line_span(content.len()),
+                        lexer.new_span(content.len()),
                         TokenType::Identifier,
                         TokenData::Identifier(content),
                     );
@@ -221,7 +212,7 @@ impl Lexer {
                         content.push(c);
                     }
                     lexer.push_token(
-                        lexer.line_span(content.len()),
+                        lexer.new_span(content.len()),
                         TokenType::String,
                         TokenData::String(content),
                     );
@@ -242,7 +233,7 @@ impl Lexer {
                     }
                     if is_float {
                         lexer.push_token(
-                            lexer.line_span(content.len()),
+                            lexer.new_span(content.len()),
                             TokenType::Float,
                             TokenData::Float(
                                 content
@@ -252,7 +243,7 @@ impl Lexer {
                         );
                     } else {
                         lexer.push_token(
-                            lexer.line_span(content.len()),
+                            lexer.new_span(content.len()),
                             TokenType::Int,
                             TokenData::Int(
                                 content.parse().map_err(|_| LexingError::InvalidIntFormat)?,
@@ -273,35 +264,16 @@ impl Lexer {
         Ok(lexer.tokens)
     }
 
-    fn char_span(&self) -> Span {
-        Span {
-            start: LineColumn {
-                line: self.line,
-                column: self.column,
-            },
-            end: LineColumn {
-                line: self.line,
-                column: self.column + 1,
-            },
-        }
+    fn new_span(&self, length: usize) -> Span {
+        Span::new(self.byte_index as u32, (self.byte_index + length) as u32)
     }
 
-    fn line_span(&self, length: usize) -> Span {
-        Span {
-            start: LineColumn {
-                line: self.line,
-                column: self.column,
-            },
-            end: LineColumn {
-                line: self.line,
-                column: self.column + length,
-            },
-        }
+    fn char_span(&self) -> Span {
+        self.new_span(1)
     }
 
     fn push_token(&mut self, span: Span, token_type: TokenType, token_data: TokenData) {
-        self.line = span.end.line;
-        self.column = span.end.column;
+        self.byte_index = span.end().0 as usize;
 
         let token = Token {
             span,
@@ -395,27 +367,27 @@ mod tests {
             input,
             vec![
                 Token {
-                    span: Span::from(((1, 0), (1, 3))),
+                    span: Span::new(0, 3),
                     token_type: TokenType::Let,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 4), (1, 9))),
+                    span: Span::new(4, 9),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("hello".to_string()),
                 },
                 Token {
-                    span: Span::from(((1, 10), (1, 11))),
+                    span: Span::new(10, 11),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 12), (1, 24))),
+                    span: Span::new(12, 24),
                     token_type: TokenType::String,
                     token_data: TokenData::String("Hi! I'm Hung".to_string()),
                 },
                 Token {
-                    span: Span::from(((1, 24), (1, 25))),
+                    span: Span::new(24, 25),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },
@@ -431,27 +403,27 @@ mod tests {
             input,
             vec![
                 Token {
-                    span: Span::from(((1, 0), (1, 3))),
+                    span: Span::new(0, 3),
                     token_type: TokenType::Let,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 4), (1, 13))),
+                    span: Span::new(4, 13),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("isAwesome".to_string()),
                 },
                 Token {
-                    span: Span::from(((1, 14), (1, 15))),
+                    span: Span::new(14, 15),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 16), (1, 20))),
+                    span: Span::new(16, 20),
                     token_type: TokenType::Boolean,
                     token_data: TokenData::Boolean(true),
                 },
                 Token {
-                    span: Span::from(((1, 20), (1, 21))),
+                    span: Span::new(20, 21),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },
@@ -467,27 +439,27 @@ mod tests {
             input,
             vec![
                 Token {
-                    span: Span::from(((1, 0), (1, 3))),
+                    span: Span::new(0, 3),
                     token_type: TokenType::Let,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 4), (1, 7))),
+                    span: Span::new(4, 7),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("age".to_string()),
                 },
                 Token {
-                    span: Span::from(((1, 8), (1, 9))),
+                    span: Span::new(8, 9),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 10), (1, 17))),
+                    span: Span::new(10, 17),
                     token_type: TokenType::Float,
                     token_data: TokenData::Float(10.5235),
                 },
                 Token {
-                    span: Span::from(((1, 17), (1, 18))),
+                    span: Span::new(17, 18),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },
@@ -503,27 +475,27 @@ mod tests {
             input,
             vec![
                 Token {
-                    span: Span::from(((1, 0), (1, 3))),
+                    span: Span::new(0, 3),
                     token_type: TokenType::Let,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 4), (1, 7))),
+                    span: Span::new(4, 7),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("age".to_string()),
                 },
                 Token {
-                    span: Span::from(((1, 8), (1, 9))),
+                    span: Span::new(8, 9),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::from(((1, 10), (1, 12))),
+                    span: Span::new(10, 12),
                     token_type: TokenType::Int,
                     token_data: TokenData::Int(22),
                 },
                 Token {
-                    span: Span::from(((1, 12), (1, 13))),
+                    span: Span::new(12, 13),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },

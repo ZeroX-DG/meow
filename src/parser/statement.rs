@@ -186,13 +186,12 @@ pub(crate) fn parse_type(stream: &mut ParsingStream<Token>) -> Result<Type, Pars
 
 #[cfg(test)]
 mod tests {
+    use codespan::Span;
+
     use super::*;
-    use crate::{
-        parser::{
-            ast::{Expression, ExpressionKind, Literal, LiteralKind, Path, PathSegment},
-            tests::{assert_parsing_result, make_token},
-        },
-        span::Span,
+    use crate::parser::{
+        ast::{Expression, ExpressionKind, Literal, LiteralKind, Path, PathSegment},
+        tests::{assert_parsing_result, make_token},
     };
 
     #[test]
@@ -215,14 +214,14 @@ mod tests {
         assert_parsing_result(
             tokens,
             parse_statement,
-            Err(ParsingError::UnexpectedToken {
-                expected_token_types: vec![TokenType::SemiConlon],
-                found_token: Token {
+            Err(ParsingError::unexpected_token(
+                &Token {
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
-                    span: Span::from(((0, 0), (0, 0))),
+                    span: Span::default(),
                 },
-            }),
+                vec![TokenType::SemiConlon],
+            )),
         );
     }
 

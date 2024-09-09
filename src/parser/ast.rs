@@ -1,6 +1,5 @@
+use codespan::Span;
 use serde::Serialize;
-
-use crate::span::Span;
 
 pub use super::expression::*;
 pub use super::path::*;

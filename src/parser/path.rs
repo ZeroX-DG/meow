@@ -1,8 +1,8 @@
+use codespan::Span;
 use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenType},
-    span::Span,
     stream::{peek, ParsingStream},
 };
 
@@ -37,15 +37,12 @@ pub fn parse_path(stream: &mut ParsingStream<Token>) -> Result<Path, ParsingErro
         }
     }
 
-    let start_location = segments.first().unwrap().span.start.clone();
-    let end_location = segments.last().unwrap().span.end.clone();
+    let start_location = segments.first().unwrap().span.start();
+    let end_location = segments.last().unwrap().span.end();
 
     Ok(Path {
         segments,
-        span: Span {
-            start: start_location,
-            end: end_location,
-        },
+        span: Span::new(start_location, end_location),
     })
 }
 
