@@ -23,15 +23,19 @@ Meow support 2 types of comments:
 
 ### Variable
 
-Variables are declared using the `let` keyword and are immutable by default. You can use add the `mut` keyword after `let` to make the variable mutable.
+Variable are always immutable in meowscript. You can declare a variable with the syntax:
+
+```
+<variable_name> :: <type> = <value>
+```
 
 The type of the variable can be specified at the end or omitted to be inferred by the transpiler.
 
 Examples:
 
 ```
-let name: string; // Explitcit type.
-let name = 'Bob'; // Inferred as string by transpiler.
+name :: string = 'Bob'; // Explitcit type.
+name = 'Bob'; // Inferred as string by compiler.
 ```
 
 ### Function
@@ -41,13 +45,13 @@ Functions are first-class entities in Meow. Thus, it can be assigned to a variab
 Examples:
 
 ```
-let myFunction = fn() { ... };
+myFunction :: fn() = { ... };
 
 // Function that doesn't take in any arguments can be simplified to:
-let myFunction = fn {}
+myFunction :: fn = {}
 
-let functionThatReturn = fn(arg: string) -> string {}
-let functionThatReturn = fn -> string {}
+functionThatReturn :: fn(arg: string) -> string = {}
+functionThatReturn :: fn -> string = {}
 
-let find = fn(array: string[], pred: fn(string) -> bool) {}
+find :: fn(array: string[], pred: fn(string) -> bool) = {}
 ```
