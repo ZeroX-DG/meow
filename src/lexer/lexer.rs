@@ -144,16 +144,6 @@ impl Lexer {
                         continue;
                     }
 
-                    if content == "let" {
-                        lexer.push_token(lexer.new_span(3), TokenType::Let, TokenData::None);
-                        continue;
-                    }
-
-                    if content == "mut" {
-                        lexer.push_token(lexer.new_span(3), TokenType::Mut, TokenData::None);
-                        continue;
-                    }
-
                     if content == "return" {
                         lexer.push_token(lexer.new_span(6), TokenType::Return, TokenData::None);
                         continue;
@@ -343,15 +333,13 @@ mod tests {
 
     #[test]
     fn tokenize_keywords() {
-        let input = "fn class mut let _something_else20 return";
+        let input = "fn class _something_else20 return";
 
         assert_token_types(
             input,
             vec![
                 TokenType::Function,
                 TokenType::Class,
-                TokenType::Mut,
-                TokenType::Let,
                 TokenType::Identifier,
                 TokenType::Return,
                 TokenType::EOF,
@@ -361,66 +349,25 @@ mod tests {
 
     #[test]
     fn tokenize_string_literals() {
-        let input = "let hello = 'Hi! I\\'m Hung'";
+        let input = "hello = 'Hi! I\\'m Hung'";
 
         assert_tokens(
             input,
             vec![
                 Token {
-                    span: Span::new(0, 3),
-                    token_type: TokenType::Let,
-                    token_data: TokenData::None,
-                },
-                Token {
-                    span: Span::new(4, 9),
+                    span: Span::new(0, 5),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("hello".to_string()),
                 },
                 Token {
-                    span: Span::new(10, 11),
+                    span: Span::new(6, 7),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::new(12, 24),
+                    span: Span::new(8, 20),
                     token_type: TokenType::String,
                     token_data: TokenData::String("Hi! I'm Hung".to_string()),
-                },
-                Token {
-                    span: Span::new(24, 25),
-                    token_type: TokenType::EOF,
-                    token_data: TokenData::None,
-                },
-            ],
-        );
-    }
-
-    #[test]
-    fn tokenize_boolean() {
-        let input = "let isAwesome = true";
-
-        assert_tokens(
-            input,
-            vec![
-                Token {
-                    span: Span::new(0, 3),
-                    token_type: TokenType::Let,
-                    token_data: TokenData::None,
-                },
-                Token {
-                    span: Span::new(4, 13),
-                    token_type: TokenType::Identifier,
-                    token_data: TokenData::Identifier("isAwesome".to_string()),
-                },
-                Token {
-                    span: Span::new(14, 15),
-                    token_type: TokenType::Eq,
-                    token_data: TokenData::None,
-                },
-                Token {
-                    span: Span::new(16, 20),
-                    token_type: TokenType::Boolean,
-                    token_data: TokenData::Boolean(true),
                 },
                 Token {
                     span: Span::new(20, 21),
@@ -432,34 +379,60 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_boolean() {
+        let input = "isAwesome = true";
+
+        assert_tokens(
+            input,
+            vec![
+                Token {
+                    span: Span::new(0, 9),
+                    token_type: TokenType::Identifier,
+                    token_data: TokenData::Identifier("isAwesome".to_string()),
+                },
+                Token {
+                    span: Span::new(10, 11),
+                    token_type: TokenType::Eq,
+                    token_data: TokenData::None,
+                },
+                Token {
+                    span: Span::new(12, 16),
+                    token_type: TokenType::Boolean,
+                    token_data: TokenData::Boolean(true),
+                },
+                Token {
+                    span: Span::new(16, 17),
+                    token_type: TokenType::EOF,
+                    token_data: TokenData::None,
+                },
+            ],
+        );
+    }
+
+    #[test]
     fn tokenize_float_literals() {
-        let input = "let age = 10.5235";
+        let input = "age = 10.5235";
 
         assert_tokens(
             input,
             vec![
                 Token {
                     span: Span::new(0, 3),
-                    token_type: TokenType::Let,
-                    token_data: TokenData::None,
-                },
-                Token {
-                    span: Span::new(4, 7),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("age".to_string()),
                 },
                 Token {
-                    span: Span::new(8, 9),
+                    span: Span::new(4, 5),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::new(10, 17),
+                    span: Span::new(6, 13),
                     token_type: TokenType::Float,
                     token_data: TokenData::Float(10.5235),
                 },
                 Token {
-                    span: Span::new(17, 18),
+                    span: Span::new(13, 14),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },
@@ -469,33 +442,28 @@ mod tests {
 
     #[test]
     fn tokenize_int_literals() {
-        let input = "let age = 22";
+        let input = "age = 22";
 
         assert_tokens(
             input,
             vec![
                 Token {
                     span: Span::new(0, 3),
-                    token_type: TokenType::Let,
-                    token_data: TokenData::None,
-                },
-                Token {
-                    span: Span::new(4, 7),
                     token_type: TokenType::Identifier,
                     token_data: TokenData::Identifier("age".to_string()),
                 },
                 Token {
-                    span: Span::new(8, 9),
+                    span: Span::new(4, 5),
                     token_type: TokenType::Eq,
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::new(10, 12),
+                    span: Span::new(6, 8),
                     token_type: TokenType::Int,
                     token_data: TokenData::Int(22),
                 },
                 Token {
-                    span: Span::new(12, 13),
+                    span: Span::new(8, 9),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },

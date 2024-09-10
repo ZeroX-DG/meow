@@ -24,8 +24,6 @@ pub enum TokenType {
     // Keywords
     Function,
     Class,
-    Let,
-    Mut,
     Return,
 
     // Operators
