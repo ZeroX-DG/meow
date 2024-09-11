@@ -1,9 +1,6 @@
-use crate::parser::ast::{
-    ExpressionKind, ItemKind, LiteralKind, Operator, StatementKind, VariableDeclarationKind,
-};
+use crate::parser::ast::{ExpressionKind, ItemKind, LiteralKind, Operator, StatementKind};
 
 use super::TargetCompiler;
-use std::fmt::Write;
 
 pub struct JavaScriptCompiler;
 
@@ -18,31 +15,6 @@ impl TargetCompiler for JavaScriptCompiler {
         };
         compiled_item.push(';');
         compiled_item
-    }
-
-    fn compile_variable_declaration(
-        &mut self,
-        var_declaration: crate::parser::ast::VariableDeclaration,
-    ) -> String {
-        let mut output = String::new();
-
-        if var_declaration.is_mutable {
-            write!(&mut output, "let").unwrap();
-        } else {
-            write!(&mut output, "const").unwrap();
-        }
-
-        write!(&mut output, " ").unwrap();
-        write!(&mut output, "{}", var_declaration.identifier.name).unwrap();
-
-        match var_declaration.kind {
-            VariableDeclarationKind::Declaration => {}
-            VariableDeclarationKind::Init(expr) => {
-                write!(&mut output, "={}", self.compile_expression(expr)).unwrap();
-            }
-        }
-
-        output
     }
 
     fn compile_expression(&mut self, expr: crate::parser::ast::Expression) -> String {
@@ -102,7 +74,6 @@ impl TargetCompiler for JavaScriptCompiler {
 
     fn compile_statement(&mut self, statement: crate::parser::ast::Statement) -> String {
         match statement.kind {
-            StatementKind::Let(var_dclr) => self.compile_variable_declaration(var_dclr),
             StatementKind::Expr(expr) => self.compile_expression(expr),
             StatementKind::Assignment(assignment) => self.compile_assignment(assignment),
             StatementKind::Return(expr) => format!("return {}", self.compile_expression(expr)),

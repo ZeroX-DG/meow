@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenData, TokenType},
-    parser::{ast::TypeKind, match_token, statement::parse_statement},
+    parser::{ast::TypeKind, match_token, path, statement::parse_statement},
     stream::{peek, ParsingStream},
 };
 
@@ -12,7 +12,7 @@ use super::{
     basics::parse_identifier,
     expect_token,
     path::{parse_path, Path},
-    statement::{parse_type, Statement},
+    statement::Statement,
     ParsingError,
 };
 
@@ -179,7 +179,12 @@ fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, Pars
         _ => unreachable!(),
     };
 
-    let arg_type = parse_type(stream)?;
+    expect_token!(stream.next(), [Colon]);
+
+    let path = path::parse_path(stream)?;
+    let arg_type = Type {
+        kind: TypeKind::TypePath(path),
+    };
 
     Ok(FunctionArg {
         identifier,
@@ -426,9 +431,9 @@ fn parse_literal_expression(stream: &mut ParsingStream<Token>) -> Result<Express
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        ast::TypeKind,
+        ast::{Assignment, TypeKind},
         path::{Path, PathSegment},
-        statement::{StatementKind, VariableDeclaration, VariableDeclarationKind},
+        statement::StatementKind,
         tests::{assert_parsing_result, make_token},
     };
 
@@ -575,7 +580,6 @@ mod tests {
                 ),
                 make_token(TokenType::ParenClose, TokenData::None),
                 make_token(TokenType::CurlyBracketOpen, TokenData::None),
-                make_token(TokenType::Let, TokenData::None),
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("a".to_string()),
@@ -620,7 +624,7 @@ mod tests {
                     ],
                     body: Block {
                         statements: vec![Statement {
-                            kind: StatementKind::Let(VariableDeclaration {
+                            kind: StatementKind::Assignment(Assignment {
                                 identifier: Identifier {
                                     name: "a".to_string(),
                                     span: Span::default(),
@@ -628,14 +632,13 @@ mod tests {
                                 variable_type: Type {
                                     kind: TypeKind::Infer,
                                 },
-                                kind: VariableDeclarationKind::Init(Expression {
+                                expression: Expression {
                                     kind: ExpressionKind::Literal(Literal {
                                         kind: LiteralKind::Int(10),
                                         span: Span::default(),
                                     }),
                                     span: Span::default(),
-                                }),
-                                is_mutable: false,
+                                },
                             }),
                         }],
                     },

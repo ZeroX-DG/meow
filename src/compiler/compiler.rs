@@ -1,12 +1,10 @@
 use crate::parser::ast::{
     Assignment, BinaryOp, Call, Expression, Function, Item, Literal, Path, Program, Statement,
-    VariableDeclaration,
 };
 
 pub trait TargetCompiler {
     fn new() -> Self;
     fn compile_item(&mut self, item: Item) -> String;
-    fn compile_variable_declaration(&mut self, var_declaration: VariableDeclaration) -> String;
     fn compile_expression(&mut self, expr: Expression) -> String;
     fn compile_literal(&mut self, literal: Literal) -> String;
     fn compile_function(&mut self, function: Function) -> String;
