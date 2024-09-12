@@ -23,6 +23,7 @@ use codespan_reporting::{
 #[derive(PartialEq, Clone)]
 pub enum ParsingErrorType {
     UnexpectedToken(Token),
+    MissingSemicolon(Span),
 }
 
 pub struct ParsingError {
@@ -79,6 +80,18 @@ impl ParsingError {
         }
     }
 
+    pub fn missing_semicolon(span: Span) -> Self {
+        let diagnostic = Diagnostic::error()
+            .with_code("E02")
+            .with_message("Missing semicolon");
+
+        Self {
+            error_type: ParsingErrorType::MissingSemicolon(span),
+            files: SimpleFiles::new(),
+            diagnostic,
+        }
+    }
+
     pub fn add_file(mut self, name: String, source: String, range: Span) -> Self {
         let file_id = self.files.add(name, source);
         self.diagnostic = self
@@ -89,6 +102,12 @@ impl ParsingError {
 }
 
 macro_rules! expect_token {
+    ($token:expr, [SemiConlon]) => {
+        match $token.token_type {
+            TokenType::SemiConlon => {},
+            _ => return Err(ParsingError::missing_semicolon(codespan::Span::new($token.span.start().0, $token.span.start().0)))
+        }
+    };
     ($token:expr, [$($token_type:ident),*]) => {
         match $token.token_type {
             $(

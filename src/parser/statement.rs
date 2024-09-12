@@ -71,7 +71,10 @@ fn parse_assignment_statement(
     });
 
     let expression = expression::parse_expression(stream)?;
-    expect_token!(&stream.next(), [SemiConlon]);
+    expect_token!(stream.peek(1), [SemiConlon]);
+
+    stream.next();
+
     Ok(Statement {
         kind: StatementKind::Assignment(Assignment {
             identifier,

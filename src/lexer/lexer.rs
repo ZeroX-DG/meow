@@ -34,11 +34,14 @@ impl Lexer {
         let mut chars = input.chars();
         let mut stream = ParsingStream::new(&mut chars, '\0');
 
+        stream.on_next_item(move |ch| {
+            lexer.byte_index += ch.len_utf8();
+        });
+
         loop {
             let ch = stream.next();
             match ch {
                 ch if ch.is_whitespace() => {
-                    lexer.byte_index += ch.len_utf8();
                     continue;
                 }
                 '(' => lexer.push_token(lexer.char_span(), TokenType::ParenOpen, TokenData::None),
@@ -66,10 +69,7 @@ impl Lexer {
                 '/' if peek_next!(stream, '/') => {
                     // Comments
                     // Ignore for now.
-                    stream.consume_until(|c| {
-                        lexer.byte_index += c.len_utf8();
-                        *c == '\n'
-                    });
+                    stream.consume_until(|c| *c == '\n');
                 }
                 '/' => lexer.push_token(lexer.char_span(), TokenType::Divide, TokenData::None),
                 '*' => lexer.push_token(lexer.char_span(), TokenType::Multiply, TokenData::None),
@@ -263,7 +263,7 @@ impl Lexer {
     }
 
     fn push_token(&mut self, span: Span, token_type: TokenType, token_data: TokenData) {
-        self.byte_index = span.end().0 as usize;
+        self.byte_index = (span.end().0 + 1) as usize;
 
         let token = Token {
             span,

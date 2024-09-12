@@ -16,6 +16,7 @@ pub struct ParsingStream<'a, T: PartialEq + Clone> {
     stream_end_item: T,
     buffer: VecDeque<T>,
     current: Option<T>,
+    callback: Option<Box<dyn FnMut(T)>>,
 }
 
 impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
@@ -26,7 +27,12 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
             input,
             stream_end_item,
             buffer: vec![first_item].into(),
+            callback: None,
         }
+    }
+
+    pub fn on_next_item(&mut self, callback: impl FnMut(T) + 'static) {
+        self.callback = Some(Box::new(callback));
     }
 
     pub fn current(&self) -> &Option<T> {
@@ -40,6 +46,10 @@ impl<'a, T: PartialEq + Clone> ParsingStream<'a, T> {
         if self.buffer.is_empty() {
             self.buffer
                 .push_back(self.input.next().unwrap_or(self.stream_end_item.clone()));
+        }
+
+        if let Some(callback) = &mut self.callback {
+            (callback)(result.clone());
         }
 
         result

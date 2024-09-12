@@ -27,17 +27,28 @@ fn main() {
             let writer = StandardStream::stderr(ColorChoice::Always);
             let config = codespan_reporting::term::Config::default();
 
-            let ParsingErrorType::UnexpectedToken(token) = error.error_type().clone();
-            let error = error.add_file(
-                Path::new(&file_path)
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                file_content,
-                token.span,
-            );
+            let error = match error.error_type().clone() {
+                ParsingErrorType::UnexpectedToken(token) => error.add_file(
+                    Path::new(&file_path)
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    file_content,
+                    token.span,
+                ),
+                ParsingErrorType::MissingSemicolon(span) => error.add_file(
+                    Path::new(&file_path)
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    file_content,
+                    span,
+                ),
+            };
 
             term::emit(
                 &mut writer.lock(),
