@@ -2,7 +2,9 @@ use serde::Serialize;
 
 use crate::{
     lexer::{Token, TokenType},
-    parser::{ast::TypeKind, basics, expect_token, expression, match_token, path},
+    parser::{
+        ast::TypeKind, basics, expect_semicolon, expect_token, expression, match_token, path,
+    },
     stream::{peek, ParsingStream},
 };
 
@@ -71,8 +73,7 @@ fn parse_assignment_statement(
     });
 
     let expression = expression::parse_expression(stream)?;
-    expect_token!(stream.peek(1), [SemiConlon]);
-
+    expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
     stream.next();
 
     Ok(Statement {
@@ -90,7 +91,8 @@ fn parse_expression_statement(
     stream: &mut ParsingStream<Token>,
 ) -> Result<Statement, ParsingError> {
     let expression = expression::parse_expression(stream)?;
-    expect_token!(&stream.next(), [SemiConlon]);
+    expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
+    stream.next();
     Ok(Statement {
         kind: StatementKind::Expr(expression),
     })
@@ -101,7 +103,8 @@ fn parse_expression_statement(
 fn parse_return_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
     expect_token!(&stream.next(), [Return]);
     let expression = expression::parse_expression(stream)?;
-    expect_token!(&stream.next(), [SemiConlon]);
+    expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
+    stream.next();
     Ok(Statement {
         kind: StatementKind::Return(expression),
     })

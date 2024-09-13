@@ -102,18 +102,26 @@ impl ParsingError {
 }
 
 macro_rules! expect_token {
-    ($token:expr, [SemiConlon]) => {
-        match $token.token_type {
-            TokenType::SemiConlon => {},
-            _ => return Err(ParsingError::missing_semicolon(codespan::Span::new($token.span.start().0, $token.span.start().0)))
-        }
-    };
     ($token:expr, [$($token_type:ident),*]) => {
         match $token.token_type {
             $(
                 TokenType::$token_type => {}
             ),*,
             _ => return Err(ParsingError::unexpected_token(&$token, vec![$(TokenType::$token_type),*]))
+        }
+    };
+}
+
+macro_rules! expect_semicolon {
+    ($current_token:expr, $next_token:expr) => {
+        match $next_token.token_type {
+            TokenType::SemiConlon => {}
+            _ => {
+                return Err(ParsingError::missing_semicolon(codespan::Span::new(
+                    $current_token.span.end().0,
+                    $current_token.span.end().0,
+                )))
+            }
         }
     };
 }
@@ -139,6 +147,7 @@ macro_rules! match_token {
     }
 }
 
+pub(crate) use expect_semicolon;
 pub(crate) use expect_token;
 pub(crate) use match_token;
 

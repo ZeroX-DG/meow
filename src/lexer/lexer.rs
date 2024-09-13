@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use codespan::Span;
 
 use super::token::{Token, TokenData, TokenType};
@@ -18,14 +20,14 @@ pub enum LexingError {
 
 pub struct Lexer {
     tokens: Vec<Token>,
-    byte_index: usize,
+    byte_index: Rc<RefCell<usize>>,
 }
 
 impl Lexer {
     fn new() -> Self {
         Self {
             tokens: Vec::new(),
-            byte_index: 0,
+            byte_index: Rc::new(RefCell::new(0)),
         }
     }
 
@@ -33,9 +35,17 @@ impl Lexer {
         let mut lexer = Self::new();
         let mut chars = input.chars();
         let mut stream = ParsingStream::new(&mut chars, '\0');
+        let byte_index = lexer.byte_index.clone();
+        let byte_index_clone = lexer.byte_index.clone();
+
+        let mut is_first_character = true;
 
         stream.on_next_item(move |ch| {
-            lexer.byte_index += ch.len_utf8();
+            if is_first_character {
+                is_first_character = false;
+                return;
+            }
+            *byte_index_clone.borrow_mut() += ch.len_utf8();
         });
 
         loop {
@@ -75,55 +85,93 @@ impl Lexer {
                 '*' => lexer.push_token(lexer.char_span(), TokenType::Multiply, TokenData::None),
                 '+' => lexer.push_token(lexer.char_span(), TokenType::Plus, TokenData::None),
                 '-' if peek_next!(stream, '>') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::ThinArrow, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::ThinArrow,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '-' => lexer.push_token(lexer.char_span(), TokenType::Minus, TokenData::None),
                 '%' => lexer.push_token(lexer.char_span(), TokenType::Mod, TokenData::None),
                 '|' if peek_next!(stream, '|') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::OrOr, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::OrOr,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '|' => lexer.push_token(lexer.char_span(), TokenType::Or, TokenData::None),
                 '&' if peek_next!(stream, '&') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::AndAnd, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::AndAnd,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '&' => lexer.push_token(lexer.char_span(), TokenType::And, TokenData::None),
                 '!' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::NotEq, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::NotEq,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '!' => lexer.push_token(lexer.char_span(), TokenType::Not, TokenData::None),
                 '=' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::EqEq, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::EqEq,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '=' if peek_next!(stream, '>') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::FatArrow, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::FatArrow,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '=' => lexer.push_token(lexer.char_span(), TokenType::Eq, TokenData::None),
                 '>' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::GreaterEq, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::GreaterEq,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '>' => lexer.push_token(lexer.char_span(), TokenType::GreaterThan, TokenData::None),
                 '<' if peek_next!(stream, '=') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::LessEq, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::LessEq,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 '<' => lexer.push_token(lexer.char_span(), TokenType::LessThan, TokenData::None),
                 ',' => lexer.push_token(lexer.char_span(), TokenType::Comma, TokenData::None),
                 '.' => lexer.push_token(lexer.char_span(), TokenType::Period, TokenData::None),
                 ':' if peek_next!(stream, ':') => {
-                    lexer.push_token(lexer.new_span(2), TokenType::ColonColon, TokenData::None);
+                    lexer.push_token(
+                        lexer.new_span_from_current_index(2),
+                        TokenType::ColonColon,
+                        TokenData::None,
+                    );
                     stream.next();
                 }
                 ':' => lexer.push_token(lexer.char_span(), TokenType::Colon, TokenData::None),
                 ';' => lexer.push_token(lexer.char_span(), TokenType::SemiConlon, TokenData::None),
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let mut content = String::from(ch);
+
+                    let start_index = *byte_index.borrow();
 
                     loop {
                         let c = peek!(stream);
@@ -135,23 +183,35 @@ impl Lexer {
                     }
 
                     if content == "fn" {
-                        lexer.push_token(lexer.new_span(2), TokenType::Function, TokenData::None);
+                        lexer.push_token(
+                            lexer.new_span(start_index, 2),
+                            TokenType::Function,
+                            TokenData::None,
+                        );
                         continue;
                     }
 
                     if content == "class" {
-                        lexer.push_token(lexer.new_span(5), TokenType::Class, TokenData::None);
+                        lexer.push_token(
+                            lexer.new_span(start_index, 5),
+                            TokenType::Class,
+                            TokenData::None,
+                        );
                         continue;
                     }
 
                     if content == "return" {
-                        lexer.push_token(lexer.new_span(6), TokenType::Return, TokenData::None);
+                        lexer.push_token(
+                            lexer.new_span(start_index, 6),
+                            TokenType::Return,
+                            TokenData::None,
+                        );
                         continue;
                     }
 
                     if content == "true" {
                         lexer.push_token(
-                            lexer.new_span(4),
+                            lexer.new_span(start_index, 4),
                             TokenType::Boolean,
                             TokenData::Boolean(true),
                         );
@@ -160,7 +220,7 @@ impl Lexer {
 
                     if content == "false" {
                         lexer.push_token(
-                            lexer.new_span(5),
+                            lexer.new_span(start_index, 5),
                             TokenType::Boolean,
                             TokenData::Boolean(false),
                         );
@@ -168,12 +228,13 @@ impl Lexer {
                     }
 
                     lexer.push_token(
-                        lexer.new_span(content.len()),
+                        lexer.new_span(start_index, content.len()),
                         TokenType::Identifier,
                         TokenData::Identifier(content),
                     );
                 }
                 '\'' => {
+                    let start_index = *byte_index.borrow();
                     let mut content = String::new();
                     loop {
                         let c = peek!(stream);
@@ -202,7 +263,7 @@ impl Lexer {
                         content.push(c);
                     }
                     lexer.push_token(
-                        lexer.new_span(content.len()),
+                        lexer.new_span(start_index, content.len() + 2), // plus 2 for the quotes
                         TokenType::String,
                         TokenData::String(content),
                     );
@@ -210,6 +271,7 @@ impl Lexer {
                 '0'..='9' => {
                     let mut content = String::from(ch);
                     let mut is_float = false;
+                    let start_index = *byte_index.borrow();
                     loop {
                         let c = peek!(stream);
                         if !c.is_numeric() && c != '.' {
@@ -223,7 +285,7 @@ impl Lexer {
                     }
                     if is_float {
                         lexer.push_token(
-                            lexer.new_span(content.len()),
+                            lexer.new_span(start_index, content.len()),
                             TokenType::Float,
                             TokenData::Float(
                                 content
@@ -233,7 +295,7 @@ impl Lexer {
                         );
                     } else {
                         lexer.push_token(
-                            lexer.new_span(content.len()),
+                            lexer.new_span(start_index, content.len()),
                             TokenType::Int,
                             TokenData::Int(
                                 content.parse().map_err(|_| LexingError::InvalidIntFormat)?,
@@ -254,17 +316,20 @@ impl Lexer {
         Ok(lexer.tokens)
     }
 
-    fn new_span(&self, length: usize) -> Span {
-        Span::new(self.byte_index as u32, (self.byte_index + length) as u32)
+    fn new_span(&self, start_index: usize, length: usize) -> Span {
+        Span::new(start_index as u32, (start_index + length) as u32)
+    }
+
+    fn new_span_from_current_index(&self, length: usize) -> Span {
+        let index = *self.byte_index.borrow();
+        self.new_span(index, length)
     }
 
     fn char_span(&self) -> Span {
-        self.new_span(1)
+        self.new_span_from_current_index(1)
     }
 
     fn push_token(&mut self, span: Span, token_type: TokenType, token_data: TokenData) {
-        self.byte_index = (span.end().0 + 1) as usize;
-
         let token = Token {
             span,
             token_type,
