@@ -1,3 +1,4 @@
+use codespan::Span;
 use serde::Serialize;
 
 use crate::{
@@ -17,6 +18,7 @@ use super::{
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Statement {
     pub kind: StatementKind,
+    pub span: Span,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -76,12 +78,15 @@ fn parse_assignment_statement(
     expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
     stream.next();
 
+    let span = Span::new(identifier.span.start(), expression.span.end());
+
     Ok(Statement {
         kind: StatementKind::Assignment(Assignment {
             identifier,
             variable_type,
             expression,
         }),
+        span,
     })
 }
 
@@ -93,20 +98,26 @@ fn parse_expression_statement(
     let expression = expression::parse_expression(stream)?;
     expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
     stream.next();
+    let span = Span::new(expression.span.start(), expression.span.end().0 + 1);
+
     Ok(Statement {
         kind: StatementKind::Expr(expression),
+        span,
     })
 }
 
 /// Parse an ReturnStatement with syntax:
 /// ReturnStatement = <Return> + <Expression> + ;
 fn parse_return_statement(stream: &mut ParsingStream<Token>) -> Result<Statement, ParsingError> {
-    expect_token!(&stream.next(), [Return]);
+    let return_token = stream.next();
+    expect_token!(return_token, [Return]);
     let expression = expression::parse_expression(stream)?;
     expect_semicolon!(stream.current().clone().unwrap(), stream.peek(1));
     stream.next();
+    let span = Span::new(return_token.span.start(), expression.span.end().0 + 1);
     Ok(Statement {
         kind: StatementKind::Return(expression),
+        span,
     })
 }
 
@@ -196,6 +207,7 @@ mod tests {
                     span: Span::default(),
                 },
             }),
+            span: Span::new(0, 1),
         };
         assert_parsing_result(tokens, parse_statement, Ok(expected));
     }
@@ -231,6 +243,7 @@ mod tests {
                     span: Span::default(),
                 },
             }),
+            span: Span::new(0, 1),
         };
         assert_parsing_result(tokens, parse_statement, Ok(expected));
     }

@@ -640,6 +640,7 @@ mod tests {
                                     span: Span::default(),
                                 },
                             }),
+                            span: Span::new(0, 1),
                         }],
                     },
                     return_type: Type {

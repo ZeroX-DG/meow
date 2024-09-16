@@ -12,6 +12,6 @@ next_age = fn(age: number) -> number {
 
 hello(name, age);
 
-age = next_age(age);
+new_age = next_age(age);
 
-hello(name, age);
+hello(name, new_age);
