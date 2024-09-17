@@ -165,7 +165,7 @@ fn parse_function_declaration(
 }
 
 /// Parse an argument with syntax:
-/// Arg = <Identifer> + : + <Type>
+/// Arg = <Identifer> + :: + <Type>
 fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, ParsingError> {
     let token = stream.next();
 
@@ -179,7 +179,7 @@ fn parse_argument(stream: &mut ParsingStream<Token>) -> Result<FunctionArg, Pars
         _ => unreachable!(),
     };
 
-    expect_token!(stream.next(), [Colon]);
+    expect_token!(stream.next(), [ColonColon]);
 
     let path = path::parse_path(stream)?;
     let arg_type = Type {
@@ -568,7 +568,7 @@ mod tests {
                     TokenType::Identifier,
                     TokenData::Identifier("hello".to_string()),
                 ),
-                make_token(TokenType::Colon, TokenData::None),
+                make_token(TokenType::ColonColon, TokenData::None),
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("string".to_string()),
@@ -578,7 +578,7 @@ mod tests {
                     TokenType::Identifier,
                     TokenData::Identifier("world".to_string()),
                 ),
-                make_token(TokenType::Colon, TokenData::None),
+                make_token(TokenType::ColonColon, TokenData::None),
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("string".to_string()),
@@ -676,7 +676,7 @@ mod tests {
                     TokenType::Identifier,
                     TokenData::Identifier("hello".to_string()),
                 ),
-                make_token(TokenType::Colon, TokenData::None),
+                make_token(TokenType::ColonColon, TokenData::None),
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("string".to_string()),
@@ -686,7 +686,7 @@ mod tests {
                     TokenType::Identifier,
                     TokenData::Identifier("world".to_string()),
                 ),
-                make_token(TokenType::Colon, TokenData::None),
+                make_token(TokenType::ColonColon, TokenData::None),
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("string".to_string()),

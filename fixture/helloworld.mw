@@ -2,11 +2,11 @@ name :: string = 'Hung';
 age :: number = 22;
 
 
-hello = fn(name: string, age: number) {
+hello = fn(name :: string, age :: number) {
     console.log('Hello my name is ' + name + '. I\'m ' + age + ' years old!');
 };
 
-next_age = fn(age: number) -> number {
+next_age = fn(age :: number) -> number {
     return age + 1;
 };
 
