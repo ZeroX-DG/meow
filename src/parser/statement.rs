@@ -207,7 +207,7 @@ mod tests {
                     span: Span::default(),
                 },
             }),
-            span: Span::new(0, 1),
+            span: Span::default(),
         };
         assert_parsing_result(tokens, parse_statement, Ok(expected));
     }
@@ -243,7 +243,7 @@ mod tests {
                     span: Span::default(),
                 },
             }),
-            span: Span::new(0, 1),
+            span: Span::default(),
         };
         assert_parsing_result(tokens, parse_statement, Ok(expected));
     }

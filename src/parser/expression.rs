@@ -568,6 +568,11 @@ mod tests {
                     TokenType::Identifier,
                     TokenData::Identifier("hello".to_string()),
                 ),
+                make_token(TokenType::Colon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("string".to_string()),
+                ),
                 make_token(TokenType::Comma, TokenData::None),
                 make_token(
                     TokenType::Identifier,
@@ -600,7 +605,16 @@ mod tests {
                                 span: Span::default(),
                             },
                             arg_type: Type {
-                                kind: TypeKind::Infer,
+                                kind: TypeKind::TypePath(Path {
+                                    segments: vec![PathSegment {
+                                        ident: Identifier {
+                                            name: "string".to_string(),
+                                            span: Span::default(),
+                                        },
+                                        span: Span::default(),
+                                    }],
+                                    span: Span::default(),
+                                }),
                             },
                         },
                         FunctionArg {
@@ -640,7 +654,7 @@ mod tests {
                                     span: Span::default(),
                                 },
                             }),
-                            span: Span::new(0, 1),
+                            span: Span::default(),
                         }],
                     },
                     return_type: Type {
@@ -661,6 +675,11 @@ mod tests {
                 make_token(
                     TokenType::Identifier,
                     TokenData::Identifier("hello".to_string()),
+                ),
+                make_token(TokenType::Colon, TokenData::None),
+                make_token(
+                    TokenType::Identifier,
+                    TokenData::Identifier("string".to_string()),
                 ),
                 make_token(TokenType::Comma, TokenData::None),
                 make_token(
@@ -687,7 +706,16 @@ mod tests {
                                 span: Span::default(),
                             },
                             arg_type: Type {
-                                kind: TypeKind::Infer,
+                                kind: TypeKind::TypePath(Path {
+                                    segments: vec![PathSegment {
+                                        ident: Identifier {
+                                            name: "string".to_string(),
+                                            span: Span::default(),
+                                        },
+                                        span: Span::default(),
+                                    }],
+                                    span: Span::default(),
+                                }),
                             },
                         },
                         FunctionArg {

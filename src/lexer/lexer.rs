@@ -430,12 +430,12 @@ mod tests {
                     token_data: TokenData::None,
                 },
                 Token {
-                    span: Span::new(8, 20),
+                    span: Span::new(8, 22),
                     token_type: TokenType::String,
                     token_data: TokenData::String("Hi! I'm Hung".to_string()),
                 },
                 Token {
-                    span: Span::new(20, 21),
+                    span: Span::new(23, 24),
                     token_type: TokenType::EOF,
                     token_data: TokenData::None,
                 },
